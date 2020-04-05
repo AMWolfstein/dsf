@@ -10,10 +10,10 @@ use std::fmt;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use std::io::BufWriter;
+//use std::io::BufWriter;
 use std::io::Read;
 use std::io::SeekFrom;
-use std::io::Write;
+//use std::io::Write;
 use std::path::Path;
 use std::u64;
 
@@ -44,7 +44,7 @@ pub struct DsfFile {
 }
 impl DsfFile {
     // Open a DSF file.
-    pub fn open(path: &Path) -> Result<DsfFile, DSFError> {
+    pub fn open(path: &Path) -> Result<DsfFile, Error> {
         let mut file = File::open(path)?;
 
         let mut dsd_chunk_buffer: [u8; 28] = [0; 28];
@@ -117,6 +117,8 @@ impl fmt::Display for DsfFile {
     }
 }
 
+const DSD_CHUNK_HEADER: [u8; 4] = ['D' as u8, 'S' as u8, 'D' as u8, ' ' as u8];
+
 struct DsdChunk {
     file_size: u64,
     metadata_offset: u64,
@@ -138,18 +140,17 @@ impl fmt::Display for DsdChunk {
         )
     }
 }
-const DSD_CHUNK_HEADER: [u8; 4] = ['D' as u8, 'S' as u8, 'D' as u8, ' ' as u8];
 impl TryFrom<[u8; 28]> for DsdChunk {
-    type Error = DSFError;
+    type Error = Error;
 
     fn try_from(buffer: [u8; 28]) -> Result<Self, Self::Error> {
         if &buffer[0..4] != DSD_CHUNK_HEADER {
-            return Err(DSFError::DsdChunkHeader);
+            return Err(Error::DsdChunkHeader);
         }
 
         let chunk_size = u64_from_byte_buffer(&buffer, 4);
         if chunk_size != 28 {
-            return Err(DSFError::DsdChunkSize);
+            return Err(Error::DsdChunkSize);
         }
 
         let file_size = u64_from_byte_buffer(&buffer, 12);
@@ -158,6 +159,8 @@ impl TryFrom<[u8; 28]> for DsdChunk {
         Ok(DsdChunk::new(file_size, metadata_offset))
     }
 }
+
+const FMT_CHUNK_HEADER: [u8; 4] = ['f' as u8, 'm' as u8, 't' as u8, ' ' as u8];
 
 struct FmtChunk {
     pub channel_type: ChannelType,
@@ -217,44 +220,49 @@ Calculated duration = {} h:min:s;samples",
         )
     }
 }
-const FMT_CHUNK_HEADER: [u8; 4] = ['f' as u8, 'm' as u8, 't' as u8, ' ' as u8];
 impl TryFrom<[u8; 52]> for FmtChunk {
-    type Error = DSFError;
+    type Error = Error;
 
     fn try_from(buffer: [u8; 52]) -> Result<Self, Self::Error> {
         if &buffer[0..4] != FMT_CHUNK_HEADER {
-            return Err(DSFError::FmtChunkHeader);
+            return Err(Error::FmtChunkHeader);
         }
 
         let chunk_size = u64_from_byte_buffer(&buffer, 4);
         if chunk_size != 52 {
-            return Err(DSFError::FmtChunkSize);
+            return Err(Error::FmtChunkSize);
         }
 
         let format_version = u32_from_byte_buffer(&buffer, 12);
         if format_version != 1 {
-            return Err(DSFError::FormatVersion);
+            return Err(Error::FormatVersion);
         }
 
         let format_id = u32_from_byte_buffer(&buffer, 16);
         if format_id != 0 {
-            return Err(DSFError::FormatId);
+            return Err(Error::FormatId);
         }
 
         let channel_type = ChannelType::try_from(u32_from_byte_buffer(&buffer, 20))?;
+
         let channel_num = u32_from_byte_buffer(&buffer, 24);
+        match channel_num {
+            1 | 2 | 3 | 4 | 5 | 6 => (),
+            _ => return Err(Error::ChannelNum),
+        }
+
         let sampling_frequency = u32_from_byte_buffer(&buffer, 28);
         let bits_per_sample = u32_from_byte_buffer(&buffer, 32);
         let sample_count = u64_from_byte_buffer(&buffer, 36);
 
         let block_size_per_channel = u32_from_byte_buffer(&buffer, 44);
         if block_size_per_channel != BLOCK_SIZE as u32 {
-            return Err(DSFError::BlockSizePerChannelNonStandard);
+            return Err(Error::BlockSizePerChannelNonStandard);
         }
 
         let reserved = u32_from_byte_buffer(&buffer, 48);
         if reserved != 0 {
-            return Err(DSFError::ReservedNotZero);
+            return Err(Error::ReservedNotZero);
         }
 
         Ok(FmtChunk::new(
@@ -297,7 +305,7 @@ impl fmt::Display for ChannelType {
     }
 }
 impl TryFrom<u32> for ChannelType {
-    type Error = DSFError;
+    type Error = Error;
 
     fn try_from(channel_type_as_u32: u32) -> Result<Self, Self::Error> {
         match channel_type_as_u32 {
@@ -308,10 +316,12 @@ impl TryFrom<u32> for ChannelType {
             5 => Ok(ChannelType::FourChannels),
             6 => Ok(ChannelType::FiveChannels),
             7 => Ok(ChannelType::FivePointOneChannels),
-            _ => Err(DSFError::ChannelType),
+            _ => Err(Error::ChannelType),
         }
     }
 }
+
+const DATA_CHUNK_HEADER: [u8; 4] = ['d' as u8, 'a' as u8, 't' as u8, 'a' as u8];
 
 struct DataChunk {
     chunk_size: u64,
@@ -326,47 +336,17 @@ impl fmt::Display for DataChunk {
         write!(f, "Data chunk size = {} bytes", self.chunk_size)
     }
 }
-const DATA_CHUNK_HEADER: [u8; 4] = ['d' as u8, 'a' as u8, 't' as u8, 'a' as u8];
 impl TryFrom<[u8; 12]> for DataChunk {
-    type Error = DSFError;
+    type Error = Error;
 
     fn try_from(buffer: [u8; 12]) -> Result<Self, Self::Error> {
         if &buffer[0..4] != DATA_CHUNK_HEADER {
-            return Err(DSFError::DataChunkHeader);
+            return Err(Error::DataChunkHeader);
         }
 
         let chunk_size = u64_from_byte_buffer(&buffer, 4);
 
         Ok(DataChunk::new(chunk_size))
-    }
-}
-// TODO: Move this to the top as it is public
-pub enum DSFError {
-    Id3Error(id3::Error),
-    IoError(io::Error),
-    DsdChunkHeader,
-    DsdChunkSize,
-    DsdChunkError,
-    FmtChunkHeader,
-    FmtChunkSize,
-    FormatVersion,
-    FormatId,
-    ChannelType,
-    ChannelNum,
-    BlockSizePerChannelNonStandard,
-    ReservedNotZero,
-    DataChunkHeader,
-}
-impl From<io::Error> for DSFError {
-    fn from(error: io::Error) -> Self {
-        DSFError::IoError(error)
-    }
-
-    // TODO Display trait?
-}
-impl From<id3::Error> for DSFError {
-    fn from(error: id3::Error) -> Self {
-        DSFError::Id3Error(error)
     }
 }
 
@@ -408,11 +388,7 @@ pub struct SampleData {
     file: File,
 }
 impl SampleData {
-    fn new(
-        file: File,
-        fmt_chunk: &FmtChunk,
-        data_chunk: &DataChunk,
-    ) -> Result<SampleData, DSFError> {
+    fn new(file: File, fmt_chunk: &FmtChunk, data_chunk: &DataChunk) -> Result<SampleData, Error> {
         let dsopc_total: u64 = fmt_chunk.sample_count / 8;
 
         let channel_total: usize = fmt_chunk.channel_num as usize;
@@ -470,7 +446,7 @@ impl SampleData {
         self.dsopc_total
     }
 
-    fn read_bf(&mut self, bf_index: u64) -> Result<bool, DSFError> {
+    fn read_bf(&mut self, bf_index: u64) -> Result<bool, Error> {
         if self.bf_total == 0 || bf_index >= self.bf_total {
             return Ok(false);
         }
@@ -494,7 +470,7 @@ impl SampleData {
         Ok(true)
     }
 
-    fn read_next_bf(&mut self) -> Result<bool, DSFError> {
+    fn read_next_bf(&mut self) -> Result<bool, Error> {
         if self.bf_index + 1 < self.bf_total {
             for channel_index in 0..self.channel_total {
                 let mut block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
@@ -624,4 +600,71 @@ fn u32_from_byte_buffer(buffer: &[u8], index: usize) -> u32 {
     byte_array.copy_from_slice(&buffer[index..index + 4]);
 
     u32::from_le_bytes(byte_array)
+}
+
+#[derive(Debug)]
+pub enum Error {
+    BlockSizePerChannelNonStandard,
+    ChannelNum,
+    ChannelType,
+    DataChunkHeader,
+    DsdChunkHeader,
+    DsdChunkSize,
+    FmtChunkHeader,
+    FmtChunkSize,
+    FormatId,
+    FormatVersion,
+    Id3Error(id3::Error),
+    IoError(io::Error),
+    ReservedNotZero,
+}
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::BlockSizePerChannelNonStandard => write!(
+                f,
+                "A fmt chunk is expected to specify its block size per channel as {}.",
+                BLOCK_SIZE
+            ),
+            Error::ChannelNum => {
+                f.write_str("A fmt chunk’s channel num is expected to be in the range 1–6.")
+            }
+            Error::ChannelType => {
+                f.write_str("A fmt chunk’s channel type is expected to be in the range 1–7.")
+            }
+            Error::DataChunkHeader => f.write_str("A data chunk must start with the bytes 'data'."),
+            Error::DsdChunkHeader => f.write_str("A DSD chunk must start with the bytes 'DSD '."),
+            Error::DsdChunkSize => f.write_str("A DSD chunk must specify its size as 28 bytes."),
+            Error::FmtChunkHeader => f.write_str("A fmt chunk must start with the bytes 'fmt '."),
+            Error::FmtChunkSize => {
+                f.write_str("A fmt chunk is expected to specify its size as 52 bytes.")
+            }
+            Error::FormatId => f.write_str("A fmt chumk must specifiy a format ID of 0."),
+            Error::FormatVersion => f.write_str("A fmt chunk must specify version 1."),
+            Error::Id3Error(id3_error) => write!(f, "Id3 error: {}", id3_error),
+            Error::IoError(io_error) => write!(f, "IO error: {}", io_error),
+            Error::ReservedNotZero => {
+                f.write_str("A fmt chunk’s reserved space is expected to be zero filled.")
+            }
+        }
+    }
+}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::Id3Error(id3_error) => Some(id3_error),
+            Error::IoError(io_error) => Some(io_error),
+            _ => None,
+        }
+    }
+}
+impl From<id3::Error> for Error {
+    fn from(error: id3::Error) -> Self {
+        Error::Id3Error(error)
+    }
+}
+impl From<io::Error> for Error {
+    fn from(error: io::Error) -> Self {
+        Error::IoError(error)
+    }
 }
