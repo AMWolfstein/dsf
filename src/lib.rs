@@ -627,7 +627,9 @@ impl<'a> Frames<'a> {
     /// Load the frame specified by `frame_index` into memory. The
     /// `Frames` struct keeps only one frame in memory at a time.
     fn load_frame(&mut self, frame_index: u64) -> Result<(), Error> {
-        debug_assert!(frame_index < self.number_of_frames());
+        if frame_index >= self.number_of_frames() {
+            return Err(Error::FrameIndexOutOfRange);
+        }
 
         self.dsf_file
             .file
@@ -772,8 +774,9 @@ pub enum Error {
     Id3Error(id3::Error),
     IoError(io::Error),
     ReservedNotZero,
-    SampleIndexOutOfRange,
     ChannelIndexOutOfRange,
+    SampleIndexOutOfRange,
+    FrameIndexOutOfRange,
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -803,8 +806,9 @@ impl fmt::Display for Error {
             Error::ReservedNotZero => {
                 f.write_str("A fmt chunk’s reserved space is expected to be zero filled.")
             }
-            Error::SampleIndexOutOfRange => f.write_str("Sample index is out of range."),
             Error::ChannelIndexOutOfRange => f.write_str("Channel index is out of range."),
+            Error::SampleIndexOutOfRange => f.write_str("Sample index is out of range."),
+            Error::FrameIndexOutOfRange => f.write_str("Frame index is out of range."),
         }
     }
 }
