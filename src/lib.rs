@@ -1,8 +1,33 @@
-//! # dsf
+//! DSF file utilities.
 //!
-//! Utilities for working with DSF files. A DSF (DSD Stream File) is
-//! an audio file which contains DSD audio data along with various
-//! forms of metadata.
+//! A DSF (DSD Stream File) is a high-resolution audio file which
+//! contains uncompressed DSD audio data along with information about
+//! how the audio data is encoded. It can also optionally include an
+//! [ID3v2](http://id3.org/) tag which contains metadata about the
+//! music e.g. artist, album, etc.
+//!
+//! # Examples
+//!
+//! This example displays the metadata for the DSF file
+//! `my/music.dsf`.
+//!
+//!```no_run
+//! use dsf::DsfFile;
+//! use std::path::Path;
+//!
+//! fn main() {
+//!    let path = Path::new("my/music.dsf");
+//!
+//!    match DsfFile::open(path) {
+//!        Ok(dsf_file) => {
+//!            println!("DSF file metadata:\n\n{}", dsf_file);
+//!        }
+//!        Err(error) => {
+//!            println!("Error: {}", error);
+//!        }
+//!    }
+//! }
+//! ```
 
 use id3::Tag;
 use std::convert::TryFrom;
@@ -10,10 +35,8 @@ use std::fmt;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-//use std::io::BufWriter;
 use std::io::Read;
 use std::io::SeekFrom;
-//use std::io::Write;
 use std::path::Path;
 use std::u64;
 
@@ -23,27 +46,49 @@ use std::u64;
 /// Specification](https://dsd-guide.com/sites/default/files/white-papers/DSFFileFormatSpec_E.pdf)
 /// divides a DSF file into four chunks:
 ///
-/// - DSD chunk
-/// - fmt chunk
-/// - data chunk
-/// - metadata chunk
+/// - [DSD chunk](struct.DsdChunk.html): basic file headers, size and pointers to other chunks.
+/// - [Fmt chunk](struct.FmtChunk.html): information about the audio format e.g. sampling rate, etc.
+/// - [Data chunk](struct.DataChunk.html): the audio samples.
+/// - [Metadata chunk](id3::Tag): an optional ID3v2 metadata tag.
 ///
-/// The audio data is contained in the data chunk, everything else is
-/// metadata about how the audio data should be interpretted or
-/// metatadata about the audio itself e.g. Arist, Album, etc. So our
-/// `Dsf` is made up of a `SampleData` struct which represents the
-/// audio data, and a `Metadata` struct which represents everything
-/// else.
+/// The fields of the `DsfFile` struct reflect this specification,
+/// with an additional [File](std::fs::File) field for the underlying file.
 pub struct DsfFile {
     file: File,
     dsd_chunk: DsdChunk,
     fmt_chunk: FmtChunk,
     data_chunk: DataChunk,
-    //sample_data: SampleData,
-    id3_tag: Tag,
+    id3_tag: Option<Tag>,
 }
 impl DsfFile {
-    // Open a DSF file.
+    /// Attempt to open and parse the metadata of DSF file in
+    /// read-only mode. Sample data is not read into memory to keep
+    /// the memory footprint small.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if `path` does not exist or
+    /// is not a readable and valid DSF file.
+    ///
+    /// # Examples
+    ///
+    ///```no_run
+    /// use dsf::DsfFile;
+    /// use std::path::Path;
+    ///
+    /// fn main() {
+    ///    let path = Path::new("my/music.dsf");
+    ///
+    ///    match DsfFile::open(path) {
+    ///        Ok(dsf_file) => {
+    ///            println!("DSF file metadata:\n\n{}", dsf_file);
+    ///        }
+    ///        Err(error) => {
+    ///            println!("Error: {}", error);
+    ///        }
+    ///    }
+    /// }
+    /// ```
     pub fn open(path: &Path) -> Result<DsfFile, Error> {
         let mut file = File::open(path)?;
 
@@ -59,76 +104,116 @@ impl DsfFile {
         file.read_exact(&mut data_chunk_buffer)?;
         let data_chunk = DataChunk::try_from(data_chunk_buffer)?;
 
-        // id3v2 tag test
-        file.seek(SeekFrom::Start(dsd_chunk.metadata_offset))?;
-        let id3_tag = Tag::read_from(&file)?;
-        // TODO: Change the way that we construct this so that it is neater
-        //let sample_data = SampleData::new(file, &metadata)?;
+        let id3_tag: Option<Tag> = match dsd_chunk.metadata_offset {
+            0 => None,
+            _ => {
+                file.seek(SeekFrom::Start(dsd_chunk.metadata_offset))?;
+                Some(Tag::read_from(&file)?)
+            }
+        };
 
         Ok(DsfFile {
             file,
             dsd_chunk,
             fmt_chunk,
             data_chunk,
-            //sample_data,
             id3_tag,
         })
     }
 
-    // TODO: fn interleave_samples_iter() -> InterleavedSamplesIter
-    // TODO: fn channel_samples_iter(channelnum: u32) -> ChannelSamplesIter
+    /// Return a reference to the underlying [File](std::fs::File).
+    pub fn file(&self) -> &File {
+        &self.file
+    }
 
-    // TODO: Not sure this is the best place for this function
-    // pub fn format_elapsed_of_total_duration(&self) -> String {
-    //     let sampling_frequency = self.fmt_chunk.sampling_frequency as u64;
-    //     let total_samples = self.fmt_chunk.sample_count;
-    //     let total_seconds = total_samples / sampling_frequency;
+    /// Return a reference to the [DsdChunk](struct.DsdChunk.html).
+    pub fn dsd_chunk(&self) -> &DsdChunk {
+        &self.dsd_chunk
+    }
 
-    //     let duration_hours = total_seconds / 3600;
-    //     let duration_minutes = (total_seconds / 60) - duration_hours * 60;
-    //     let duration_seconds = total_seconds - (duration_hours * 3600 + duration_minutes * 60);
+    /// Return a reference to the [FmtChunk](struct.FmtChunk.html).
+    pub fn fmt_chunk(&self) -> &FmtChunk {
+        &self.fmt_chunk
+    }
 
-    //     let elapsed_seconds = (self.sample_data.get_fraction() * total_seconds as f64) as u64;
-    //     let elapsed_hours = elapsed_seconds / 3600;
-    //     let elapsed_minutes = (elapsed_seconds / 60) - elapsed_hours * 60;
-    //     let elapsed_seconds = elapsed_seconds - (elapsed_hours * 3600 + elapsed_minutes * 60);
+    /// Return a reference to the [DataChunk](struct.DataChunk.html).
+    pub fn data_chunk(&self) -> &DataChunk {
+        &self.data_chunk
+    }
 
-    //     format!(
-    //         "{:02}:{:02}:{:02}/{:02}:{:02}:{:02}",
-    //         elapsed_hours,
-    //         elapsed_minutes,
-    //         elapsed_seconds,
-    //         duration_hours,
-    //         duration_minutes,
-    //         duration_seconds
-    //     )
-    // }
+    /// Return a reference to the optional ID3v2 [Tag](id3::Tag).
+    pub fn id3_tag(&self) -> &Option<Tag> {
+        &self.id3_tag
+    }
+
+    /// Return a representation of the sample data as [Frames](struct.Frames.html).
+    pub fn frames(&mut self) -> Result<Frames, Error> {
+        Frames::new(self)
+    }
+
+    /// Return an
+    /// [InterleavedU32SamplesIter](struct.InterleavedU32SamplesIter.html)
+    /// for the sample data contained in this DSF file.
+    pub fn interleaved_u32_samples_iter(&mut self) -> Result<InterleavedU32SamplesIter, Error> {
+        InterleavedU32SamplesIter::new(self)
+    }
+
+    // TODO: fn channel_samples_iter(channel_index: u32) -> ChannelSamplesIter
 }
 impl fmt::Display for DsfFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: Implement Display on the id3_tag
         write!(
             f,
             "DSD chunk:\n{}\n\nFmt chunk:\n{}\n\nData chunk:\n{}\n\nID3Tag:{:?}",
-            self.dsd_chunk,
-            self.fmt_chunk,
-            self.data_chunk,
-            self.id3_tag //self.sample_data
+            self.dsd_chunk, self.fmt_chunk, self.data_chunk, self.id3_tag
         )
     }
 }
 
+/// Return a `u64` which starts from `index` in the specified byte
+/// buffer, interpretting the bytes as little-endian.
+fn u64_from_byte_buffer(buffer: &[u8], index: usize) -> u64 {
+    let mut byte_array: [u8; 8] = [0; 8];
+    byte_array.copy_from_slice(&buffer[index..index + 8]);
+
+    u64::from_le_bytes(byte_array)
+}
+
+/// Return a `u32` which starts from `index` in the specified byte
+/// buffer, interpretting the bytes as little-endian.
+fn u32_from_byte_buffer(buffer: &[u8], index: usize) -> u32 {
+    let mut byte_array: [u8; 4] = [0; 4];
+    byte_array.copy_from_slice(&buffer[index..index + 4]);
+
+    u32::from_le_bytes(byte_array)
+}
+
+/// The first chunk of a DSF file is the
+/// [DsdChunk](struct.DsdChunk.html), which must begin with the
+/// following four bytes.
 const DSD_CHUNK_HEADER: [u8; 4] = ['D' as u8, 'S' as u8, 'D' as u8, ' ' as u8];
 
-struct DsdChunk {
+/// The DSD chunk is the first chunk of a DSF file.
+///
+/// It contains the DSF file size and the offset of the ID3v2 tag if
+/// one exists.
+pub struct DsdChunk {
     file_size: u64,
     metadata_offset: u64,
 }
 impl DsdChunk {
+    /// Make a new `DsdChunk`.
     fn new(file_size: u64, metadata_offset: u64) -> DsdChunk {
         DsdChunk {
             file_size,
             metadata_offset,
         }
+    }
+
+    /// Returns the file size in bytes.
+    pub fn file_size(&self) -> u64 {
+        self.file_size
     }
 }
 impl fmt::Display for DsdChunk {
@@ -160,17 +245,26 @@ impl TryFrom<[u8; 28]> for DsdChunk {
     }
 }
 
+/// The first four bytes of the [FmtChunk](struct.FmtChunk.html).
 const FMT_CHUNK_HEADER: [u8; 4] = ['f' as u8, 'm' as u8, 't' as u8, ' ' as u8];
 
-struct FmtChunk {
-    pub channel_type: ChannelType,
-    pub channel_num: u32,
-    pub sampling_frequency: u32,
-    pub bits_per_sample: u32,
-    pub sample_count: u64,
-    pub block_size_per_channel: u32,
+/// The fmt chunk contains information about the audio format.
+///
+/// - Channel type: mono, stereo, 5.1, etc.
+/// - Channel number: 1 for mono, 2 for stereo, etc.
+/// - Sampling frequency: the DSD sampling frequency.
+/// - Bits per sample: whether the samples are big or little endian encoded.
+/// - Block size per channel: this should always be 4096 bytes.
+pub struct FmtChunk {
+    channel_type: ChannelType,
+    channel_num: u32,
+    sampling_frequency: u32,
+    bits_per_sample: u32,
+    sample_count: u64,
+    block_size_per_channel: u32,
 }
 impl FmtChunk {
+    /// Make a new `FmtChunk`.
     fn new(
         channel_type: ChannelType,
         channel_num: u32,
@@ -189,6 +283,54 @@ impl FmtChunk {
         }
     }
 
+    /// Return a reference to the
+    /// [ChannelType](enum.ChannelType.html).
+    pub fn channel_type(&self) -> &ChannelType {
+        &self.channel_type
+    }
+
+    /// Return the number of channels. This should be in the range 1
+    /// to 6.
+    pub fn channel_num(&self) -> u32 {
+        self.channel_num
+    }
+
+    /// Return the sampling freqency. DSD sampling frequencies are
+    /// much higher than PCM because of the 1-bit sampling, so you
+    /// should get values like:
+    ///
+    /// -  2822400 Hz for DSD64
+    /// -  5644800 Hz for DSD128
+    /// - 11289600 Hz for DSD256
+    ///
+    /// and so on.
+    pub fn sampling_frequency(&self) -> u32 {
+        self.sampling_frequency
+    }
+
+    /// Returns the `bits_per_sample` field. This is a bit of a
+    /// misnomer in my opinion, but that’s what’s in the DSF
+    /// specification. If it is equal to 1 then the sample data is
+    /// stored least significant bit first. If it is equal to 8 then
+    /// the sample data is stored most significant bit first.
+    // TODO: Consider creating an endian-ness field instead to replace
+    // this field
+    pub fn bits_per_sample(&self) -> u32 {
+        self.bits_per_sample
+    }
+
+    /// Return the number of DSD samples per channel.
+    pub fn sample_count(&self) -> u64 {
+        self.sample_count
+    }
+
+    /// Return the block size per channel in bytes. This is fixed and
+    /// should always be 4096 bytes.
+    pub fn block_size_per_channel(&self) -> u32 {
+        self.block_size_per_channel
+    }
+
+    // TODO: Use a audio duration format
     fn format_duration(&self) -> String {
         let hours = self.sample_count / (self.sampling_frequency as u64 * 3600);
         let minutes = (self.sample_count / (self.sampling_frequency as u64 * 60)) - (hours * 60);
@@ -276,7 +418,43 @@ impl TryFrom<[u8; 52]> for FmtChunk {
     }
 }
 
-enum ChannelType {
+/// The different channel formats possible for a DSF file.
+///
+/// The channel specification is as follows:
+///
+/// <table style="empty-cells: hide;">
+/// <tr><td></td><th style="text-align: center;" colspan="6">Channel Index</th></tr>
+/// <tr><th>Channel Type</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th></tr>
+/// <tr><th>Mono</th>
+///   <td>Center</td>
+///   <td></td><td></td><td></td><td></td><td></td>
+/// </tr>
+/// <tr><th>Stereo</th>
+///   <td>Front Left</td><td>Front Right</td>
+///   <td></td><td></td><td></td><td></td>
+/// </tr>
+/// <tr><th>3-Channels</th>
+///   <td>Front Left</td><td>Front Right</td><td>Center</td>
+///   <td></td><td></td><td></td>
+/// </tr>
+/// <tr><th>Quad</th>
+///   <td>Front Left</td><td>Front Right</td><td>Back Left</td>
+///   <td>Back Right</td><td></td><td></td>
+/// </tr>
+/// <tr><th>4-Channels</th>
+///   <td>Front Left</td><td>Front Right</td><td>Center</td>
+///   <td>Low Frequency</td><td></td><td></td>
+/// </tr>
+/// <tr><th>5-Channels</th>
+///   <td>Front Left</td><td>Front Right</td><td>Center</td>
+///   <td>Back Left</td><td>Back Right</td><td></td>
+/// </tr>
+/// <tr><th>5.1-Channels</th>
+///   <td>Front Left</td><td>Front Right</td><td>Center</td>
+///   <td>Low Frequency</td><td>Back Left</td><td>Back Right</td>
+/// </tr>
+/// </table>
+pub enum ChannelType {
     Mono,
     Stereo,
     ThreeChannels,
@@ -321,14 +499,24 @@ impl TryFrom<u32> for ChannelType {
     }
 }
 
+/// First four bytes of the [DataChunk](struct.DataChunk.html).
 const DATA_CHUNK_HEADER: [u8; 4] = ['d' as u8, 'a' as u8, 't' as u8, 'a' as u8];
 
-struct DataChunk {
+/// The data chunk contains the DSD sample data.
+pub struct DataChunk {
     chunk_size: u64,
 }
 impl DataChunk {
+    /// Make a new `DataChunk`.
     fn new(chunk_size: u64) -> DataChunk {
         DataChunk { chunk_size }
+    }
+
+    /// The size of the data chunk in bytes. This is equal to the
+    /// sample data + 12 bytes. The extra 12 bytes are taken up by the
+    /// data chunk header and this size field.
+    pub fn chunk_size(&self) -> u64 {
+        self.chunk_size
     }
 }
 impl fmt::Display for DataChunk {
@@ -350,258 +538,225 @@ impl TryFrom<[u8; 12]> for DataChunk {
     }
 }
 
-// TODO go through below this line
-
-/*
-Nomencleture
-
-DSD Sample Octete is a single byte in the DSD data. It consists of 8 DSD 1-bit samples.
-
-dsopc_total = DSD Sample Octets Per Channel total: the total number of bytes in the DSD sample data per channel.
-dsopc_index = DSD Sample Octets Per Channel index: the current index of the byte in the DSD sample data per channel (not per block).
-channels_index = The current channel index = 0 to (channels_total - 1). Identifies the current channel we are working with.
-channels_total = The number of channels e.g. 2 for stereo, 6 for 5.1 surround sound.
-bf_index = Block-Frame index. From 0 to (bf_total - 1). The current block frame in the current_bf Vector.
-bf_total = The total number of block-frames ceiling(total blocks / channels_total).
-current_bf = A vector which contains the currently loaded block-frame. A vector of blocks, one for each channel of the current DSF frame.
-bdso_index = Index of a DSD Sample Octet inside the current block.
-
-*/
-
+/// The block size is always 4096 bytes.
 const BLOCK_SIZE: usize = 4096;
-const DSD_SILENCE_BYTE: u8 = 0x69;
-const DSF_SAMPLE_DATA_OFFSET: u64 = 92; //TODO check for off-by-one
 
-pub struct SampleData {
-    dsopc_total: u64,
-    channel_total: usize,
-    channel_index: usize,
-    bf_total: u64,
-    bf_index: u64,
-    bf_size: usize,
-    current_bf: Vec<[u8; BLOCK_SIZE]>,
-    bdso_index: usize,
-    bdso_max_for_last_bf: usize,
-    last_bf: bool,
-    end_of_data: bool,
+/// There are 8 1-bit DSD samples per byte.
+const SAMPLES_PER_BLOCK: u64 = 8 * BLOCK_SIZE as u64;
+
+/// The offset in bytes of the sample data within a DSF file.
+const SAMPLE_DATA_OFFSET: u64 = 92;
+
+/// Representation of the frames of an associated
+/// [DsfFile](struct.DsfFile.html).
+///
+/// A frame consists of n blocks, one for each channel. So a stereo
+/// frame consits of two blocks, the first contains 4096 bytes of
+/// sample data for the front-left channel, the second contains 4096
+/// bytes of data for the front-right channel.
+///
+/// Only one frame ever exists in memory at a time. When a new frame
+/// is required it is loaded from file on-demand. This keeps the
+/// memory footprint small e.g. 2 &times; 4096 = 8192 bytes for a stereo
+/// frame.
+pub struct Frames<'a> {
+    channels: usize,
+    dsf_file: &'a mut DsfFile,
+    frame: Vec<[u8; BLOCK_SIZE]>,
+    frame_index: u64,
     reverse_bits: bool,
-    file: File,
 }
-impl SampleData {
-    fn new(file: File, fmt_chunk: &FmtChunk, data_chunk: &DataChunk) -> Result<SampleData, Error> {
-        let dsopc_total: u64 = fmt_chunk.sample_count / 8;
+impl<'a> Frames<'a> {
+    /// Make a new `Frames` struct from the `dsf_file`.
+    fn new(dsf_file: &mut DsfFile) -> Result<Frames, Error> {
+        let channels = dsf_file.fmt_chunk.channel_num as usize;
 
-        let channel_total: usize = fmt_chunk.channel_num as usize;
-        let channel_index: usize = 0;
-
-        let dsd_sample_data_size: u64 = data_chunk.chunk_size - 12;
-        let bf_total: u64 = (dsd_sample_data_size / BLOCK_SIZE as u64) / channel_total as u64;
-        let bf_index: u64 = 0;
-        let bf_size = BLOCK_SIZE * channel_total;
-
-        let mut current_bf: Vec<[u8; BLOCK_SIZE]> = Vec::with_capacity(channel_total as usize);
-        for _ in 0..channel_total {
-            let block: [u8; BLOCK_SIZE] = [DSD_SILENCE_BYTE; BLOCK_SIZE];
-            current_bf.push(block);
+        let mut frame: Vec<[u8; BLOCK_SIZE]> = Vec::with_capacity(channels);
+        for _ in 0..channels {
+            frame.push([0; BLOCK_SIZE]);
         }
 
-        let bdso_index: usize = 0;
-        let bdso_max_for_last_bf: usize = (dsopc_total % BLOCK_SIZE as u64) as usize;
-        let last_bf: bool = false;
-        let end_of_data = false;
-
-        let reverse_bits: bool = fmt_chunk.bits_per_sample == 1;
-
-        let mut dsf_sample_data: SampleData = SampleData {
-            dsopc_total,
-            channel_total,
-            channel_index,
-            bf_total,
-            bf_index,
-            bf_size,
-            current_bf,
-            bdso_index,
-            bdso_max_for_last_bf,
-            last_bf,
-            end_of_data,
-            reverse_bits,
-            file,
+        let reverse_bits = match dsf_file.fmt_chunk.bits_per_sample {
+            1 => true,
+            8 => false,
+            _ => panic!("Illegal value for bits_per_sample"),
         };
 
-        dsf_sample_data.read_bf(0)?;
+        let mut frames = Frames {
+            channels,
+            dsf_file,
+            frame,
+            frame_index: 0,
+            reverse_bits,
+        };
 
-        Ok(dsf_sample_data)
+        frames.load_frame(0)?;
+
+        Ok(frames)
     }
 
-    pub fn get_fraction(&self) -> f64 {
-        (self.bf_index * BLOCK_SIZE as u64 + self.bdso_index as u64) as f64
-            / self.dsopc_total as f64
+    /// Return the number of frames in the associated
+    /// [DsfFile](struct.DsfFile.html).
+    pub fn number_of_frames(&self) -> u64 {
+        self.dsf_file.fmt_chunk.sample_count / SAMPLES_PER_BLOCK
     }
 
-    pub fn get_dsopc_index(&self) -> u64 {
-        self.bf_index * BLOCK_SIZE as u64 + self.bdso_index as u64
+    /// Return the offset (position in the DSF file in bytes) of the
+    /// specified frame. Note that `frame_index` is zero-based so the
+    /// first frame has `frame_index=0`, etc.
+    fn offset(&self, frame_index: u64) -> u64 {
+        debug_assert!(frame_index <= self.number_of_frames());
+
+        SAMPLE_DATA_OFFSET + frame_index * (BLOCK_SIZE * self.channels) as u64
     }
 
-    pub fn get_dsopc_total(&self) -> u64 {
-        self.dsopc_total
-    }
-
-    fn read_bf(&mut self, bf_index: u64) -> Result<bool, Error> {
-        if self.bf_total == 0 || bf_index >= self.bf_total {
-            return Ok(false);
+    /// Return the frame and block index as a tuple `(frame_index,
+    /// block_index)` for the given `sample_index` if they exist or a
+    /// out of range error if `sample_index >= sample_count`.
+    fn frame_and_block_index(&self, sample_index: u64) -> Result<(u64, usize), Error> {
+        if sample_index >= self.dsf_file.fmt_chunk.sample_count {
+            return Err(Error::SampleIndexOutOfRange);
         }
 
-        let bf_offset = bf_index * self.bf_size as u64;
+        let frame_index = sample_index / SAMPLES_PER_BLOCK;
+        let block_index = ((sample_index % SAMPLES_PER_BLOCK) / 8) as usize;
 
-        self.file
-            .seek(SeekFrom::Start(DSF_SAMPLE_DATA_OFFSET + bf_offset))?;
-
-        for channel_index in 0..self.channel_total {
-            let mut block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
-            self.file.read_exact(&mut block)?;
-            self.current_bf[channel_index] = block;
-        }
-
-        self.bf_index = bf_index;
-        self.last_bf = self.bf_index + 1 == self.bf_total;
-        self.bdso_index = 0;
-        self.end_of_data = false;
-
-        Ok(true)
+        Ok((frame_index, block_index))
     }
 
-    fn read_next_bf(&mut self) -> Result<bool, Error> {
-        if self.bf_index + 1 < self.bf_total {
-            for channel_index in 0..self.channel_total {
-                let mut block: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
-                self.file.read_exact(&mut block)?;
-                self.current_bf[channel_index] = block;
-            }
+    /// Load the frame specified by `frame_index` into memory. The
+    /// `Frames` struct keeps only one frame in memory at a time.
+    fn load_frame(&mut self, frame_index: u64) -> Result<(), Error> {
+        debug_assert!(frame_index < self.number_of_frames());
 
-            self.bf_index += 1;
-            self.last_bf = self.bf_index + 1 == self.bf_total;
-            self.bdso_index = 0;
+        self.dsf_file
+            .file
+            .seek(SeekFrom::Start(self.offset(frame_index)))?;
 
-            return Ok(true);
-        } else {
-            return Ok(false);
+        for i in 0..self.channels {
+            self.dsf_file.file.read_exact(&mut self.frame[i])?;
         }
+
+        self.frame_index = frame_index;
+
+        Ok(())
     }
 
-    fn get_dso(&mut self, channel_index: usize, bdso_index: usize) -> u8 {
-        if self.last_bf && bdso_index >= self.bdso_max_for_last_bf {
-            if self.reverse_bits {
-                return DSD_SILENCE_BYTE.reverse_bits();
-            } else {
-                return DSD_SILENCE_BYTE;
-            }
+    // TODO: Create unchecked versions of these functions which use debug_assert!
+    /// Return a `u32` containing the specified sample and channel.
+    fn samples_as_u32(&mut self, channel_index: usize, sample_index: u64) -> Result<u32, Error> {
+        if channel_index >= self.channels {
+            return Err(Error::ChannelIndexOutOfRange);
         }
+
+        let (frame_index, block_index) = self.frame_and_block_index(sample_index)?;
+
+        if self.frame_index != frame_index {
+            self.load_frame(frame_index)?;
+        }
+
+        let samples_as_u8_array: [u8; 4];
 
         if self.reverse_bits {
-            return self.current_bf[channel_index][bdso_index].reverse_bits();
+            samples_as_u8_array = [
+                self.frame[channel_index][block_index].reverse_bits(),
+                self.frame[channel_index][block_index + 1].reverse_bits(),
+                self.frame[channel_index][block_index + 2].reverse_bits(),
+                self.frame[channel_index][block_index + 3].reverse_bits(),
+            ];
         } else {
-            return self.current_bf[channel_index][bdso_index];
-        }
-    }
-
-    fn increment_channel_index(&mut self) -> bool {
-        if self.channel_index >= self.channel_total - 1 {
-            self.channel_index = 0;
-            return true;
-        } else {
-            self.channel_index += 1;
-            return false;
-        }
-    }
-
-    fn increment_bdso_index(&mut self, increment: usize) {
-        if self.bdso_index + increment < BLOCK_SIZE {
-            self.bdso_index += increment;
-        } else {
-            match self.read_next_bf() {
-                Ok(success) => {
-                    if !success {
-                        self.end_of_data = true;
-                    }
-                }
-                Err(_) => {
-                    println!("ERROR: Failed to read next block-frame.");
-                    self.end_of_data = true;
-                }
-            }
+            samples_as_u8_array = [
+                self.frame[channel_index][block_index],
+                self.frame[channel_index][block_index + 1],
+                self.frame[channel_index][block_index + 2],
+                self.frame[channel_index][block_index + 3],
+            ];
         }
 
-        if self.last_bf && self.bdso_index > self.bdso_max_for_last_bf {
-            self.end_of_data = true;
-        }
+        Ok(u32::from_le_bytes(samples_as_u8_array))
     }
 }
-impl Iterator for SampleData {
+
+/// Iterator which returns samples as a `u32`.
+///
+/// Each call of `next()` returns 32 DSD samples as a `u32`. The
+/// samples are interleaved in the sense that for a stereo file each
+/// iteration will return: left, right, left, right, left…
+///
+/// This is typically how DSD data is sent to a DAC.
+pub struct InterleavedU32SamplesIter<'a> {
+    channel_index: usize,
+    channels: usize,
+    frames: Frames<'a>,
+    sample_index: u64,
+    sample_count: u64,
+}
+impl<'a> InterleavedU32SamplesIter<'a> {
+    /// Make a new `InterleavedU32SamplesIter` for the specified `dsf_file`.
+    fn new(dsf_file: &mut DsfFile) -> Result<InterleavedU32SamplesIter, Error> {
+        let channels = dsf_file.fmt_chunk.channel_num as usize;
+        let sample_count = dsf_file.fmt_chunk.sample_count;
+        let frames = Frames::new(dsf_file)?;
+
+        Ok(InterleavedU32SamplesIter {
+            channel_index: 0,
+            channels,
+            frames,
+            sample_index: 0,
+            sample_count,
+        })
+    }
+
+    /// Return the current `sample_index`, which starts from 0 and
+    /// goes up to `sample_count - 1`.
+    pub fn sample_index(&self) -> u64 {
+        self.sample_index
+    }
+
+    /// Return the sample count for the associated DSF file.
+    pub fn sample_count(&self) -> u64 {
+        self.sample_count
+    }
+
+    /// Set the position of this iterator, so that `sample_index` is
+    /// included in the next iteration. The returned `sample_index` is
+    /// normalised so that it corresponds to the first 1-bit sample in
+    /// the next returned `u32`. An error is returned if the requested
+    /// `sample_index` is out of range.
+    pub fn set_sample_index(&mut self, sample_index: u64) -> Result<u64, Error> {
+        if sample_index >= self.sample_count {
+            return Err(Error::SampleIndexOutOfRange);
+        }
+
+        let normalized_sample_index = 32 * (sample_index / 32);
+        self.sample_index = normalized_sample_index;
+
+        Ok(normalized_sample_index)
+    }
+}
+impl<'a> Iterator for InterleavedU32SamplesIter<'a> {
     type Item = u32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.end_of_data {
-            return None;
+        match self
+            .frames
+            .samples_as_u32(self.channel_index, self.sample_index)
+        {
+            Ok(samples_as_u32) => {
+                self.channel_index += 1;
+                if self.channel_index >= self.channels {
+                    self.channel_index = 0;
+                    self.sample_index += 32;
+                }
+
+                Some(samples_as_u32)
+            }
+            Err(_) => None,
         }
-
-        let u32be_byte_array: [u8; 4];
-
-        u32be_byte_array = [
-            self.get_dso(self.channel_index, self.bdso_index),
-            self.get_dso(self.channel_index, self.bdso_index + 1),
-            self.get_dso(self.channel_index, self.bdso_index + 2),
-            self.get_dso(self.channel_index, self.bdso_index + 3),
-        ];
-
-        if self.increment_channel_index() {
-            self.increment_bdso_index(4);
-        }
-
-        Some(u32::from_le_bytes(u32be_byte_array))
-    }
-}
-impl fmt::Display for SampleData {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Total DSD Sample Octets Per Channel = {}
-Number of channels = {}
-Number of block-frames = {}
-Block-frame size = {} bytes
-DSD samples in last block-frame = {}
-Reverse bits = {}",
-            self.dsopc_total,
-            self.channel_total,
-            self.bf_total,
-            self.bf_size,
-            self.bdso_max_for_last_bf,
-            self.reverse_bits,
-        )
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
-
-fn u64_from_byte_buffer(buffer: &[u8], index: usize) -> u64 {
-    let mut byte_array: [u8; 8] = [0; 8];
-    byte_array.copy_from_slice(&buffer[index..index + 8]);
-
-    u64::from_le_bytes(byte_array)
-}
-
-fn u32_from_byte_buffer(buffer: &[u8], index: usize) -> u32 {
-    let mut byte_array: [u8; 4] = [0; 4];
-    byte_array.copy_from_slice(&buffer[index..index + 4]);
-
-    u32::from_le_bytes(byte_array)
-}
-
+/// Errors provided by the dsf crate.
 #[derive(Debug)]
 pub enum Error {
     BlockSizePerChannelNonStandard,
@@ -617,6 +772,8 @@ pub enum Error {
     Id3Error(id3::Error),
     IoError(io::Error),
     ReservedNotZero,
+    SampleIndexOutOfRange,
+    ChannelIndexOutOfRange,
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -646,6 +803,8 @@ impl fmt::Display for Error {
             Error::ReservedNotZero => {
                 f.write_str("A fmt chunk’s reserved space is expected to be zero filled.")
             }
+            Error::SampleIndexOutOfRange => f.write_str("Sample index is out of range."),
+            Error::ChannelIndexOutOfRange => f.write_str("Channel index is out of range."),
         }
     }
 }
@@ -668,3 +827,75 @@ impl From<io::Error> for Error {
         Error::IoError(error)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dsf_file() {
+        let path = Path::new("sine-176400hz-1000hz-15s-D64-2.8mhz.dsf");
+        //let path = Path::new("01-DavidElias-TheWindowDSD64.dsf");
+        let mut dsf_file = DsfFile::open(path).unwrap();
+
+        assert_eq!(dsf_file.fmt_chunk.block_size_per_channel, 4096);
+        assert_eq!(dsf_file.fmt_chunk.channel_num, 2);
+
+        let mut iter = match dsf_file.interleaved_u32_samples_iter() {
+            Ok(iter) => iter,
+            Err(_) => panic!(),
+        };
+        assert_eq!(iter.frames.number_of_frames(), 1292);
+        assert_eq!(iter.frames.offset(0), 92);
+        assert_eq!(iter.frames.offset(1), 8284);
+
+        assert_eq!(iter.next(), Some(2607454870));
+        assert_eq!(iter.next(), Some(2607454870));
+
+        assert_eq!(iter.next(), Some(1515565868));
+        assert_eq!(iter.next(), Some(1515565868));
+
+        assert_eq!(iter.next(), Some(2857809322));
+        assert_eq!(iter.next(), Some(2857809322));
+
+        assert_eq!(iter.next(), Some(1742120665));
+        assert_eq!(iter.next(), Some(1742120665));
+
+        assert_eq!(iter.next(), Some(2037033814));
+        assert_eq!(iter.next(), Some(2037033814));
+
+        assert_eq!(iter.next(), Some(3577113515));
+        assert_eq!(iter.next(), Some(3577113515));
+    }
+}
+
+// TODO: Not sure this is the best place for this function
+// pub fn format_elapsed_of_total_duration(&self) -> String {
+//     let sampling_frequency = self.fmt_chunk.sampling_frequency as u64;
+//     let total_samples = self.fmt_chunk.sample_count;
+//     let total_seconds = total_samples / sampling_frequency;
+
+//     let duration_hours = total_seconds / 3600;
+//     let duration_minutes = (total_seconds / 60) - duration_hours * 60;
+//     let duration_seconds = total_seconds - (duration_hours * 3600 + duration_minutes * 60);
+
+//     let elapsed_seconds = (self.sample_data.get_fraction() * total_seconds as f64) as u64;
+//     let elapsed_hours = elapsed_seconds / 3600;
+//     let elapsed_minutes = (elapsed_seconds / 60) - elapsed_hours * 60;
+//     let elapsed_seconds = elapsed_seconds - (elapsed_hours * 3600 + elapsed_minutes * 60);
+
+//     format!(
+//         "{:02}:{:02}:{:02}/{:02}:{:02}:{:02}",
+//         elapsed_hours,
+//         elapsed_minutes,
+//         elapsed_seconds,
+//         duration_hours,
+//         duration_minutes,
+//         duration_seconds
+//     )
+// }
+
+// TODO: Create AudioDuration, VideoDuration, AVDuration crate
+
+// Silence iterator for a duration
+// const DSD_SILENCE_BYTE: u8 = 0x69;

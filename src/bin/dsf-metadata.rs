@@ -3,7 +3,7 @@ use std::env;
 use std::path::Path;
 
 fn main() {
-    println!("DSF Probe");
+    println!("DSF Metadata");
 
     let clargs = CLArgs::new();
     if clargs.verbose {
