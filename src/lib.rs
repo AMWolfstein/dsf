@@ -29,6 +29,7 @@
 //! }
 //! ```
 
+use audio_duration::AudioDuration;
 use id3::Tag;
 use std::convert::TryFrom;
 use std::fmt;
@@ -330,15 +331,9 @@ impl FmtChunk {
         self.block_size_per_channel
     }
 
-    // TODO: Use a audio duration format
-    fn format_duration(&self) -> String {
-        let hours = self.sample_count / (self.sampling_frequency as u64 * 3600);
-        let minutes = (self.sample_count / (self.sampling_frequency as u64 * 60)) - (hours * 60);
-        let seconds =
-            (self.sample_count / (self.sampling_frequency as u64)) - (hours * 3600 + minutes * 60);
-        let samples = self.sample_count % (self.sampling_frequency as u64);
-
-        format!("{:02}:{:02}:{:02};{}", hours, minutes, seconds, samples)
+    /// Return the duration of the audio.
+    fn duration(&self) -> AudioDuration {
+        AudioDuration::new(self.sample_count, self.sampling_frequency)
     }
 }
 impl fmt::Display for FmtChunk {
@@ -358,7 +353,7 @@ Calculated duration = {} h:min:s;samples",
             self.bits_per_sample,
             self.sample_count,
             self.block_size_per_channel,
-            self.format_duration()
+            self.duration()
         )
     }
 }
@@ -597,6 +592,7 @@ impl<'a> Frames<'a> {
 
     /// Return the number of frames in the associated
     /// [DsfFile](struct.DsfFile.html).
+    // TODO: Convert this function to member field?
     pub fn number_of_frames(&self) -> u64 {
         self.dsf_file.fmt_chunk.sample_count / SAMPLES_PER_BLOCK
     }
@@ -872,34 +868,6 @@ mod tests {
         assert_eq!(iter.next(), Some(3577113515));
     }
 }
-
-// TODO: Not sure this is the best place for this function
-// pub fn format_elapsed_of_total_duration(&self) -> String {
-//     let sampling_frequency = self.fmt_chunk.sampling_frequency as u64;
-//     let total_samples = self.fmt_chunk.sample_count;
-//     let total_seconds = total_samples / sampling_frequency;
-
-//     let duration_hours = total_seconds / 3600;
-//     let duration_minutes = (total_seconds / 60) - duration_hours * 60;
-//     let duration_seconds = total_seconds - (duration_hours * 3600 + duration_minutes * 60);
-
-//     let elapsed_seconds = (self.sample_data.get_fraction() * total_seconds as f64) as u64;
-//     let elapsed_hours = elapsed_seconds / 3600;
-//     let elapsed_minutes = (elapsed_seconds / 60) - elapsed_hours * 60;
-//     let elapsed_seconds = elapsed_seconds - (elapsed_hours * 3600 + elapsed_minutes * 60);
-
-//     format!(
-//         "{:02}:{:02}:{:02}/{:02}:{:02}:{:02}",
-//         elapsed_hours,
-//         elapsed_minutes,
-//         elapsed_seconds,
-//         duration_hours,
-//         duration_minutes,
-//         duration_seconds
-//     )
-// }
-
-// TODO: Create AudioDuration, VideoDuration, AVDuration crate
 
 // Silence iterator for a duration
 // const DSD_SILENCE_BYTE: u8 = 0x69;
