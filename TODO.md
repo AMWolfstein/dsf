@@ -12,8 +12,7 @@
       [issue](https://github.com/polyfloyd/rust-id3/issues/37) about this.
 * [ ] Consider an `endianness` method on `FmtChunk` which would return
       a `bool` as this is more expressive than `bits_per_sample`.
-* [ ] Improve tests, automatically download dsf files to run on from
-      an archive so we don’t have large files in the git repository.
+* [ ] Move integration style tests on downloaded files to `tests` directory.
 * [ ] Add a silence iterator so that we can generate silence of
       specified length.
-* [ ] Add GitLab CI script.
+* [x] Add GitLab CI script.
