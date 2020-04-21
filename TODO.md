@@ -16,3 +16,4 @@
       an archive so we don’t have large files in the git repository.
 * [ ] Add a silence iterator so that we can generate silence of
       specified length.
+* [ ] Add GitLab CI script.
