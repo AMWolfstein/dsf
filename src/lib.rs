@@ -455,6 +455,7 @@ impl TryFrom<[u8; 52]> for FmtChunk {
 ///   <td>Low Frequency</td><td>Back Left</td><td>Back Right</td>
 /// </tr>
 /// </table>
+#[derive(Debug, Eq, PartialEq)]
 pub enum ChannelType {
     Mono,
     Stereo,
@@ -927,40 +928,48 @@ impl From<io::Error> for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
+
+    fn get_sweep_dsf_file() -> Result<DsfFile, Error> {
+        let sweep_filename = "sweep-176400hz-0-22050hz-20s-D64-2.8mhz.dsf";
+        let path = Path::new(sweep_filename);
+
+        if !path.is_file() {
+            let sweep_url =
+                "http://samplerateconverter.com/free-files/samples/dsf/sweep-176400hz-0-22050hz-20s-D64-2.8mhz.zip";
+
+            Command::new("wget")
+                .arg(sweep_url)
+                .status()
+                .expect(&format!("Failed to download {}", sweep_url));
+
+            let sweep_zip_filename = "sweep-176400hz-0-22050hz-20s-D64-2.8mhz.zip";
+            Command::new("unzip")
+                .arg(sweep_zip_filename)
+                .status()
+                .expect(&format!("Failed to unzip {}", sweep_zip_filename));
+        }
+
+        DsfFile::open(path)
+    }
 
     #[test]
-    fn dsf_file() {
-        let path = Path::new("sine-176400hz-1000hz-15s-D64-2.8mhz.dsf");
-        //let path = Path::new("01-DavidElias-TheWindowDSD64.dsf");
-        let mut dsf_file = DsfFile::open(path).unwrap();
+    fn sweep_file() {
+        let dsf_file = get_sweep_dsf_file().unwrap();
 
-        assert_eq!(dsf_file.fmt_chunk.block_size_per_channel, 4096);
+        assert_eq!(dsf_file.dsd_chunk.file_size, 14114908);
+        assert_eq!(dsf_file.dsd_chunk.metadata_offset, 0);
+
+        assert_eq!(dsf_file.fmt_chunk.channel_type, ChannelType::Stereo);
         assert_eq!(dsf_file.fmt_chunk.channel_num, 2);
+        assert_eq!(dsf_file.fmt_chunk.sampling_frequency, 2822400);
+        assert_eq!(dsf_file.fmt_chunk.bits_per_sample, 1);
+        assert_eq!(dsf_file.fmt_chunk.sample_count, 56459264);
+        assert_eq!(dsf_file.fmt_chunk.block_size_per_channel, 4096);
+        // TODO: dsf_file.fmt_chunk.duration test
 
-        let mut iter = match dsf_file.interleaved_u32_samples_iter() {
-            Ok(iter) => iter,
-            Err(_) => panic!(),
-        };
-        assert_eq!(iter.frames.frame_count, 1292);
-        assert_eq!(iter.frames.offset_unchecked(0), 92);
-        assert_eq!(iter.frames.offset_unchecked(1), 8284);
+        assert_eq!(dsf_file.data_chunk.chunk_size, 14114828);
 
-        assert_eq!(iter.next(), Some(2607454870));
-        assert_eq!(iter.next(), Some(2607454870));
-
-        assert_eq!(iter.next(), Some(1515565868));
-        assert_eq!(iter.next(), Some(1515565868));
-
-        assert_eq!(iter.next(), Some(2857809322));
-        assert_eq!(iter.next(), Some(2857809322));
-
-        assert_eq!(iter.next(), Some(1742120665));
-        assert_eq!(iter.next(), Some(1742120665));
-
-        assert_eq!(iter.next(), Some(2037033814));
-        assert_eq!(iter.next(), Some(2037033814));
-
-        assert_eq!(iter.next(), Some(3577113515));
-        assert_eq!(iter.next(), Some(3577113515));
+        // TODO: sample data test
     }
 }
