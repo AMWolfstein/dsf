@@ -3,8 +3,17 @@ name = "dsf"
 version = "0.1.0"
 authors = ["Daniel J. R. May <daniel.may@danieljrmay.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "DSF (DSD Stream File) support for Rust"
+homepage = "https://gitlab.com/danieljrmay/dsf"
+documentation = "https://docs.rs/dsf/"
+repository = "https://gitlab.com/danieljrmay/dsf"
+keywords = ["audio", "dsd", "dsf"]
+categories = ["multimedia::audio"]
+readme = "README.md"
+license = "MIT/Apache-2.0"
+exclude = [
+    ".gitlab-ci.yml",
+]
 
 [dependencies]
 audio-duration = "0.1.0"
