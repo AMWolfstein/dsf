@@ -32,8 +32,8 @@
 mod id3_display;
 
 use crate::id3_display::id3_tag_to_string;
-use audio_duration::AudioDuration;
 use id3::Tag;
+use sampled_data_duration::ConstantRateDuration;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fs::File;
@@ -338,8 +338,8 @@ impl FmtChunk {
     }
 
     /// Return the duration of the audio.
-    fn duration(&self) -> AudioDuration {
-        AudioDuration::new(self.sample_count, self.sampling_frequency)
+    fn duration(&self) -> ConstantRateDuration {
+        ConstantRateDuration::new(self.sample_count, self.sampling_frequency as u64)
     }
 }
 impl fmt::Display for FmtChunk {
