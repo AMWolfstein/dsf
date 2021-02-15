@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD033 -->
-# <img src="doc/images/logo.png" width="100" alt="Logo"/> dsf #
+# <img src="doc/images/logo.png" width="100" alt="Logo"/> DSD Stream File #
 
 [![pipeline status](https://gitlab.com/danieljrmay/dsf/badges/master/pipeline.svg)](https://gitlab.com/danieljrmay/dsf/commits/master)
 [![Crate](https://img.shields.io/crates/v/dsf.svg)](https://crates.io/crates/dsf)
