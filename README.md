@@ -1,13 +1,14 @@
-# `dsf` — *DSD Stream File* #
+<!-- markdownlint-disable MD033 -->
+# <img src="doc/images/logo.png" width="100" alt="Logo"/> dsf #
 
 [![pipeline status](https://gitlab.com/danieljrmay/dsf/badges/master/pipeline.svg)](https://gitlab.com/danieljrmay/dsf/commits/master)
 [![Crate](https://img.shields.io/crates/v/dsf.svg)](https://crates.io/crates/dsf)
 [![Documentation](https://docs.rs/dsf/badge.svg)](https://docs.rs/dsf/)
 
-DSF file support in Rust. DSF files are a high-resolution audio format
-that contain lossless 1-bit audio stream in delta sigma modulation aka
-Direct Stream Digital (DSD). The format is intended for 1-bit DSD
-DACs.
+DSF (DSD Stream File) support in Rust. DSF files are a high-resolution
+audio format that contain lossless 1-bit audio stream in delta sigma
+modulation aka Direct Stream Digital (DSD). The format is intended for
+1-bit DSD DACs.
 
 This library is used by the
 [`dsd`](https://gitlab.com/danieljrmay/dsd) project which provides
