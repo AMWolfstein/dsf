@@ -27,7 +27,7 @@
 //! }
 //! ```
 
-// Be pedantic when linting this crate using `cargo clippy`.
+// Get pedantic warnings when linting with `cargo clippy`.
 #![warn(clippy::pedantic)]
 
 mod id3_display;
