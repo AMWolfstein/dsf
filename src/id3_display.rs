@@ -1,4 +1,4 @@
-//! ID3v2 Tag display module.
+//! `ID3v2` Tag display module.
 //!
 //! This module contains functions which can be used to get a _human
 //! readable_ `String` representation of a `id3::Tag`.
@@ -42,13 +42,18 @@ fn id3_content_to_string(content: &Content) -> String {
         ),
         Content::SynchronisedLyrics(syn_lyrics) => id3_synchronised_lyrics_to_string(syn_lyrics),
         Content::Picture(picture) => id3_picture_to_string(picture),
-        Content::Unknown(data) => format!("Unknown: {} bytes", data.len()),
+        Content::Unknown(data) => format!("Unknown: {} bytes", data.data.len()),
+        Content::Popularimeter(data) => format!("Popularimeter: counter={}, rating={}. user={}", data.counter, data.rating, data.user),
+        Content::EncapsulatedObject(data) => format!("EncapsulatedObject: {} bytes", data.data.len()),
+        Content::Chapter(data) => format!("Chapter: {} frames.", data.frames.len()),
+        Content::MpegLocationLookupTable(data) => format!("MpegLocationLookupTable: {}", data),
+        _ => "Other. Don't know what to do with that.".to_string(),
     }
 }
 
-const MILLISECONDS_PER_HOUR: u32 = 3600000;
-const MILLISECONDS_PER_MINUTE: u32 = 60000;
-const MILLISECONDS_PER_SECOND: u32 = 1000;
+const MILLISECONDS_PER_HOUR: u32 = 3_600_000;
+const MILLISECONDS_PER_MINUTE: u32 = 60_000;
+const MILLISECONDS_PER_SECOND: u32 = 1_000;
 
 use id3::frame::{SynchronisedLyrics, TimestampFormat};
 fn id3_synchronised_lyrics_to_string(syn_lyrics: &SynchronisedLyrics) -> String {
@@ -60,17 +65,17 @@ fn id3_synchronised_lyrics_to_string(syn_lyrics: &SynchronisedLyrics) -> String 
     );
 
     match syn_lyrics.timestamp_format {
-        TimestampFormat::MPEG => {
+        TimestampFormat::Mpeg => {
             s.push_str(&format!("\tFrame\t{}\n", syn_lyrics.content_type));
 
-            for (frame, lyric) in syn_lyrics.content.iter() {
+            for (frame, lyric) in &syn_lyrics.content {
                 s.push_str(&format!("\t{}\t{}\n", frame, lyric));
             }
         }
-        TimestampFormat::MS => {
+        TimestampFormat::Ms => {
             s.push_str(&format!("\tTimecode\t{}\n", syn_lyrics.content_type));
 
-            for (total_ms, lyric) in syn_lyrics.content.iter() {
+            for (total_ms, lyric) in &syn_lyrics.content {
                 let hours = total_ms / MILLISECONDS_PER_HOUR;
                 let mins = (total_ms % MILLISECONDS_PER_HOUR) / MILLISECONDS_PER_MINUTE;
                 let secs = (total_ms % MILLISECONDS_PER_MINUTE) / MILLISECONDS_PER_SECOND;
@@ -79,7 +84,7 @@ fn id3_synchronised_lyrics_to_string(syn_lyrics: &SynchronisedLyrics) -> String 
                 s.push_str(&format!(
                     "\t{:02}:{:02}:{:02}.{:03}\t{}\n",
                     hours, mins, secs, ms, lyric
-                ))
+                ));
             }
         }
     }
