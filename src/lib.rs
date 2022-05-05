@@ -107,10 +107,12 @@ impl DsfFile {
         file.read_exact(&mut data_chunk_buffer)?;
         let data_chunk = DataChunk::try_from(data_chunk_buffer)?;
 
-        let id3_tag: Option<Tag> = if dsd_chunk.metadata_offset == 0 { None } else {
-                file.seek(SeekFrom::Start(dsd_chunk.metadata_offset))?;
-                Some(Tag::read_from(&file)?)
-            };
+        let id3_tag: Option<Tag> = if dsd_chunk.metadata_offset == 0 {
+            None
+        } else {
+            file.seek(SeekFrom::Start(dsd_chunk.metadata_offset))?;
+            Some(Tag::read_from(&file)?)
+        };
 
         Ok(DsfFile {
             file,
@@ -415,7 +417,7 @@ impl TryFrom<[u8; 52]> for FmtChunk {
         let sample_count = u64_from_byte_buffer(&buffer, 36);
 
         let block_size_per_channel = u32_from_byte_buffer(&buffer, 44);
-        if block_size_per_channel != BLOCK_SIZE as u32 {
+        if block_size_per_channel != BLOCK_SIZE_AS_U32 {
             return Err(Error::BlockSizePerChannelNonStandard);
         }
 
@@ -490,7 +492,7 @@ impl fmt::Display for ChannelType {
             ChannelType::Quad => "Quad: FL, FR, BL, BR.",
             ChannelType::FourChannels => "4 channels: FL, FR, C, LFE.",
             ChannelType::FiveChannels => "5 channels: FL, FR, C, BL, BR.",
-            ChannelType::FivePointOneChannels => "5.1 channels: FL, FR, C, LFE, BL, BR."
+            ChannelType::FivePointOneChannels => "5.1 channels: FL, FR, C, LFE, BL, BR.",
         };
 
         write!(f, "{}", channel_type_as_str)
@@ -555,6 +557,7 @@ impl TryFrom<[u8; 12]> for DataChunk {
 
 /// The block size is always 4096 bytes.
 const BLOCK_SIZE: usize = 4096;
+const BLOCK_SIZE_AS_U32: u32 = 4096;
 
 /// There are 8 1-bit DSD samples per byte.
 const SAMPLES_PER_BLOCK: u64 = 8 * BLOCK_SIZE as u64;
@@ -978,13 +981,13 @@ mod tests {
             Command::new("wget")
                 .arg(sweep_url)
                 .status()
-                .expect(&format!("Failed to download {}", sweep_url));
+                .unwrap_or_else(|_| panic!("Failed to download {}", sweep_url));
 
             let sweep_zip_filename = "sweep-176400hz-0-22050hz-20s-D64-2.8mhz.zip";
             Command::new("unzip")
                 .arg(sweep_zip_filename)
                 .status()
-                .expect(&format!("Failed to unzip {}", sweep_zip_filename));
+                .unwrap_or_else(|_| panic!("Failed to unzip {}", sweep_zip_filename));
         }
 
         DsfFile::open(path)
@@ -994,18 +997,18 @@ mod tests {
     fn sweep_file() {
         let dsf_file = get_sweep_dsf_file().unwrap();
 
-        assert_eq!(dsf_file.dsd_chunk.file_size, 14114908);
+        assert_eq!(dsf_file.dsd_chunk.file_size, 14_114_908);
         assert_eq!(dsf_file.dsd_chunk.metadata_offset, 0);
 
         assert_eq!(dsf_file.fmt_chunk.channel_type, ChannelType::Stereo);
         assert_eq!(dsf_file.fmt_chunk.channel_num, 2);
-        assert_eq!(dsf_file.fmt_chunk.sampling_frequency, 2822400);
+        assert_eq!(dsf_file.fmt_chunk.sampling_frequency, 2_822_400);
         assert_eq!(dsf_file.fmt_chunk.bits_per_sample, 1);
-        assert_eq!(dsf_file.fmt_chunk.sample_count, 56459264);
+        assert_eq!(dsf_file.fmt_chunk.sample_count, 56_459_264);
         assert_eq!(dsf_file.fmt_chunk.block_size_per_channel, 4096);
         // TODO: dsf_file.fmt_chunk.duration test
 
-        assert_eq!(dsf_file.data_chunk.chunk_size, 14114828);
+        assert_eq!(dsf_file.data_chunk.chunk_size, 14_114_828);
 
         // TODO: sample data test
     }

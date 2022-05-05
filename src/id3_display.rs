@@ -42,12 +42,17 @@ fn id3_content_to_string(content: &Content) -> String {
         ),
         Content::SynchronisedLyrics(syn_lyrics) => id3_synchronised_lyrics_to_string(syn_lyrics),
         Content::Picture(picture) => id3_picture_to_string(picture),
-        Content::Unknown(data) => format!("Unknown: {} bytes", data.data.len()),
-        Content::Popularimeter(data) => format!("Popularimeter: counter={}, rating={}. user={}", data.counter, data.rating, data.user),
-        Content::EncapsulatedObject(data) => format!("EncapsulatedObject: {} bytes", data.data.len()),
-        Content::Chapter(data) => format!("Chapter: {} frames.", data.frames.len()),
-        Content::MpegLocationLookupTable(data) => format!("MpegLocationLookupTable: {}", data),
-        _ => "Other. Don't know what to do with that.".to_string(),
+        Content::Unknown(unknown) => format!("Unknown: {} bytes", unknown.data.len()),
+        Content::Popularimeter(popularimeter) => format!(
+            "Popularimeter: counter={}, rating={}. user={}",
+            popularimeter.counter, popularimeter.rating, popularimeter.user
+        ),
+        Content::EncapsulatedObject(object) => {
+            format!("Encapsulated Object: {} bytes", object.data.len())
+        }
+        Content::Chapter(chapter) => format!("Chapter: {} frames.", chapter.frames.len()),
+        Content::MpegLocationLookupTable(mllt) => format!("Mpeg Location Lookup Table: {}", mllt),
+        _ => String::from("Unrecognized ID3 content type, please report this as an issue."),
     }
 }
 
@@ -88,6 +93,7 @@ fn id3_synchronised_lyrics_to_string(syn_lyrics: &SynchronisedLyrics) -> String 
             }
         }
     }
+
     s
 }
 
