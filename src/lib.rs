@@ -3,7 +3,7 @@
 //! A DSF (DSD Stream File) is a high-resolution audio file which
 //! contains uncompressed DSD audio data along with information about
 //! how the audio data is encoded. It can also optionally include an
-//! [ID3v2](http://id3.org/) tag which contains metadata about the
+//! [`ID3v2`](http://id3.org/) tag which contains metadata about the
 //! music e.g. artist, album, etc.
 //!
 //! # Examples
@@ -15,19 +15,20 @@
 //! use dsf::DsfFile;
 //! use std::path::Path;
 //!
-//! fn main() {
-//!    let path = Path::new("my/music.dsf");
+//! let path = Path::new("my/music.dsf");
 //!
-//!    match DsfFile::open(path) {
-//!        Ok(dsf_file) => {
-//!            println!("DSF file metadata:\n\n{}", dsf_file);
-//!        }
-//!        Err(error) => {
-//!            println!("Error: {}", error);
-//!        }
-//!    }
+//! match DsfFile::open(path) {
+//!     Ok(dsf_file) => {
+//!         println!("DSF file metadata:\n\n{}", dsf_file);
+//!     }
+//!     Err(error) => {
+//!         println!("Error: {}", error);
+//!     }
 //! }
 //! ```
+
+// Be pedantic when linting this crate using `cargo clippy`.
+#![warn(clippy::pedantic)]
 
 mod id3_display;
 
@@ -53,7 +54,7 @@ use std::u64;
 /// - [DSD chunk](struct.DsdChunk.html): basic file headers, size and pointers to other chunks.
 /// - [Fmt chunk](struct.FmtChunk.html): information about the audio format e.g. sampling rate, etc.
 /// - [Data chunk](struct.DataChunk.html): the audio samples.
-/// - [Metadata chunk](id3::Tag): an optional ID3v2 metadata tag.
+/// - [Metadata chunk](id3::Tag): an optional `ID3v2` metadata tag.
 ///
 /// The fields of the `DsfFile` struct reflect this specification,
 /// with an additional [File](std::fs::File) field for the underlying file.
@@ -80,17 +81,15 @@ impl DsfFile {
     /// use dsf::DsfFile;
     /// use std::path::Path;
     ///
-    /// fn main() {
-    ///    let path = Path::new("my/music.dsf");
+    /// let path = Path::new("my/music.dsf");
     ///
-    ///    match DsfFile::open(path) {
-    ///        Ok(dsf_file) => {
-    ///            println!("DSF file metadata:\n\n{}", dsf_file);
-    ///        }
-    ///        Err(error) => {
-    ///            println!("Error: {}", error);
-    ///        }
-    ///    }
+    /// match DsfFile::open(path) {
+    ///     Ok(dsf_file) => {
+    ///         println!("DSF file metadata:\n\n{}", dsf_file);
+    ///     }
+    ///     Err(error) => {
+    ///         println!("Error: {}", error);
+    ///     }
     /// }
     /// ```
     pub fn open(path: &Path) -> Result<DsfFile, Error> {
@@ -108,13 +107,10 @@ impl DsfFile {
         file.read_exact(&mut data_chunk_buffer)?;
         let data_chunk = DataChunk::try_from(data_chunk_buffer)?;
 
-        let id3_tag: Option<Tag> = match dsd_chunk.metadata_offset {
-            0 => None,
-            _ => {
+        let id3_tag: Option<Tag> = if dsd_chunk.metadata_offset == 0 { None } else {
                 file.seek(SeekFrom::Start(dsd_chunk.metadata_offset))?;
                 Some(Tag::read_from(&file)?)
-            }
-        };
+            };
 
         Ok(DsfFile {
             file,
@@ -126,38 +122,51 @@ impl DsfFile {
     }
 
     /// Return a reference to the underlying [File](std::fs::File).
+    #[must_use]
     pub fn file(&self) -> &File {
         &self.file
     }
 
-    /// Return a reference to the [DsdChunk](struct.DsdChunk.html).
+    /// Return a reference to the [`DsdChunk`](struct.DsdChunk.html).
+    #[must_use]
     pub fn dsd_chunk(&self) -> &DsdChunk {
         &self.dsd_chunk
     }
 
-    /// Return a reference to the [FmtChunk](struct.FmtChunk.html).
+    /// Return a reference to the [`FmtChunk`](struct.FmtChunk.html).
+    #[must_use]
     pub fn fmt_chunk(&self) -> &FmtChunk {
         &self.fmt_chunk
     }
 
-    /// Return a reference to the [DataChunk](struct.DataChunk.html).
+    /// Return a reference to the [`DataChunk`](struct.DataChunk.html).
+    #[must_use]
     pub fn data_chunk(&self) -> &DataChunk {
         &self.data_chunk
     }
 
-    /// Return a reference to the optional ID3v2 [Tag](id3::Tag).
+    /// Return a reference to the optional `ID3v2` [Tag](id3::Tag).
+    #[must_use]
     pub fn id3_tag(&self) -> &Option<Tag> {
         &self.id3_tag
     }
 
-    /// Return a representation of the sample data as [Frames](struct.Frames.html).
+    /// Return a representation of the sample data as [`Frames`](struct.Frames.html).
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the sample data is not readable.
     pub fn frames(&mut self) -> Result<Frames, Error> {
         Frames::new(self)
     }
 
     /// Return an
-    /// [InterleavedU32SamplesIter](struct.InterleavedU32SamplesIter.html)
+    /// [`InterleavedU32SamplesIter`](struct.InterleavedU32SamplesIter.html)
     /// for the sample data contained in this DSF file.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the sample data is not readable.
     pub fn interleaved_u32_samples_iter(&mut self) -> Result<InterleavedU32SamplesIter, Error> {
         InterleavedU32SamplesIter::new(self)
     }
@@ -197,13 +206,13 @@ fn u32_from_byte_buffer(buffer: &[u8], index: usize) -> u32 {
 }
 
 /// The first chunk of a DSF file is the
-/// [DsdChunk](struct.DsdChunk.html), which must begin with the
+/// [`DsdChunk`](struct.DsdChunk.html), which must begin with the
 /// following four bytes.
-const DSD_CHUNK_HEADER: [u8; 4] = ['D' as u8, 'S' as u8, 'D' as u8, ' ' as u8];
+const DSD_CHUNK_HEADER: [u8; 4] = [b'D', b'S', b'D', b' '];
 
 /// The DSD chunk is the first chunk of a DSF file.
 ///
-/// It contains the DSF file size and the offset of the ID3v2 tag if
+/// It contains the DSF file size and the offset of the `ID3v2` tag if
 /// one exists.
 pub struct DsdChunk {
     file_size: u64,
@@ -219,6 +228,7 @@ impl DsdChunk {
     }
 
     /// Returns the file size in bytes.
+    #[must_use]
     pub fn file_size(&self) -> u64 {
         self.file_size
     }
@@ -236,7 +246,7 @@ impl TryFrom<[u8; 28]> for DsdChunk {
     type Error = Error;
 
     fn try_from(buffer: [u8; 28]) -> Result<Self, Self::Error> {
-        if &buffer[0..4] != DSD_CHUNK_HEADER {
+        if buffer[0..4] != DSD_CHUNK_HEADER {
             return Err(Error::DsdChunkHeader);
         }
 
@@ -252,8 +262,8 @@ impl TryFrom<[u8; 28]> for DsdChunk {
     }
 }
 
-/// The first four bytes of the [FmtChunk](struct.FmtChunk.html).
-const FMT_CHUNK_HEADER: [u8; 4] = ['f' as u8, 'm' as u8, 't' as u8, ' ' as u8];
+/// The first four bytes of the [`FmtChunk`](struct.FmtChunk.html).
+const FMT_CHUNK_HEADER: [u8; 4] = [b'f', b'm', b't', b' '];
 
 /// The fmt chunk contains information about the audio format.
 ///
@@ -291,13 +301,15 @@ impl FmtChunk {
     }
 
     /// Return a reference to the
-    /// [ChannelType](enum.ChannelType.html).
+    /// [`ChannelType`](enum.ChannelType.html).
+    #[must_use]
     pub fn channel_type(&self) -> &ChannelType {
         &self.channel_type
     }
 
     /// Return the number of channels. This should be in the range 1
     /// to 6.
+    #[must_use]
     pub fn channel_num(&self) -> u32 {
         self.channel_num
     }
@@ -311,6 +323,7 @@ impl FmtChunk {
     /// - 11289600 Hz for DSD256
     ///
     /// and so on.
+    #[must_use]
     pub fn sampling_frequency(&self) -> u32 {
         self.sampling_frequency
     }
@@ -322,24 +335,27 @@ impl FmtChunk {
     /// the sample data is stored most significant bit first.
     // TODO: Consider creating an endian-ness field instead to replace
     // this field
+    #[must_use]
     pub fn bits_per_sample(&self) -> u32 {
         self.bits_per_sample
     }
 
     /// Return the number of DSD samples per channel.
+    #[must_use]
     pub fn sample_count(&self) -> u64 {
         self.sample_count
     }
 
     /// Return the block size per channel in bytes. This is fixed and
     /// should always be 4096 bytes.
+    #[must_use]
     pub fn block_size_per_channel(&self) -> u32 {
         self.block_size_per_channel
     }
 
     /// Return the duration of the audio.
     fn duration(&self) -> ConstantRateDuration {
-        ConstantRateDuration::new(self.sample_count, self.sampling_frequency as u64)
+        ConstantRateDuration::new(self.sample_count, u64::from(self.sampling_frequency))
     }
 }
 impl fmt::Display for FmtChunk {
@@ -367,7 +383,7 @@ impl TryFrom<[u8; 52]> for FmtChunk {
     type Error = Error;
 
     fn try_from(buffer: [u8; 52]) -> Result<Self, Self::Error> {
-        if &buffer[0..4] != FMT_CHUNK_HEADER {
+        if buffer[0..4] != FMT_CHUNK_HEADER {
             return Err(Error::FmtChunkHeader);
         }
 
@@ -467,19 +483,15 @@ pub enum ChannelType {
 }
 impl fmt::Display for ChannelType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let channel_type_as_str;
-
-        match self {
-            ChannelType::Mono => channel_type_as_str = "Mono",
-            ChannelType::Stereo => channel_type_as_str = "Stereo: FL, FR.",
-            ChannelType::ThreeChannels => channel_type_as_str = "3 channels: FL, FR, C.",
-            ChannelType::Quad => channel_type_as_str = "Quad: FL, FR, BL, BR.",
-            ChannelType::FourChannels => channel_type_as_str = "4 channels: FL, FR, C, LFE.",
-            ChannelType::FiveChannels => channel_type_as_str = "5 channels: FL, FR, C, BL, BR.",
-            ChannelType::FivePointOneChannels => {
-                channel_type_as_str = "5.1 channels: FL, FR, C, LFE, BL, BR."
-            }
-        }
+        let channel_type_as_str = match self {
+            ChannelType::Mono => "Mono",
+            ChannelType::Stereo => "Stereo: FL, FR.",
+            ChannelType::ThreeChannels => "3 channels: FL, FR, C.",
+            ChannelType::Quad => "Quad: FL, FR, BL, BR.",
+            ChannelType::FourChannels => "4 channels: FL, FR, C, LFE.",
+            ChannelType::FiveChannels => "5 channels: FL, FR, C, BL, BR.",
+            ChannelType::FivePointOneChannels => "5.1 channels: FL, FR, C, LFE, BL, BR."
+        };
 
         write!(f, "{}", channel_type_as_str)
     }
@@ -501,8 +513,8 @@ impl TryFrom<u32> for ChannelType {
     }
 }
 
-/// First four bytes of the [DataChunk](struct.DataChunk.html).
-const DATA_CHUNK_HEADER: [u8; 4] = ['d' as u8, 'a' as u8, 't' as u8, 'a' as u8];
+/// First four bytes of the [`DataChunk`](struct.DataChunk.html).
+const DATA_CHUNK_HEADER: [u8; 4] = [b'd', b'a', b't', b'a'];
 
 /// The data chunk contains the DSD sample data.
 pub struct DataChunk {
@@ -517,6 +529,7 @@ impl DataChunk {
     /// The size of the data chunk in bytes. This is equal to the
     /// sample data + 12 bytes. The extra 12 bytes are taken up by the
     /// data chunk header and this size field.
+    #[must_use]
     pub fn chunk_size(&self) -> u64 {
         self.chunk_size
     }
@@ -530,7 +543,7 @@ impl TryFrom<[u8; 12]> for DataChunk {
     type Error = Error;
 
     fn try_from(buffer: [u8; 12]) -> Result<Self, Self::Error> {
-        if &buffer[0..4] != DATA_CHUNK_HEADER {
+        if buffer[0..4] != DATA_CHUNK_HEADER {
             return Err(Error::DataChunkHeader);
         }
 
@@ -550,7 +563,7 @@ const SAMPLES_PER_BLOCK: u64 = 8 * BLOCK_SIZE as u64;
 const SAMPLE_DATA_OFFSET: u64 = 92;
 
 /// Representation of the frames of an associated
-/// [DsfFile](struct.DsfFile.html).
+/// [`DsfFile`](struct.DsfFile.html).
 ///
 /// A frame consists of n blocks, one for each channel. So a stereo
 /// frame consits of two blocks, the first contains 4096 bytes of
@@ -604,8 +617,11 @@ impl<'a> Frames<'a> {
     /// specified frame.
     ///
     /// Note that `frame_index` is zero-based so the first frame has
-    /// `frame_index=0`, etc. Thie method returns an error if
-    /// `frame_index >= frame_count`.
+    /// `frame_index=0`, etc.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an error if`frame_index >= frame_count`.
     pub fn offset(&self, frame_index: u64) -> Result<u64, Error> {
         if frame_index >= self.frame_count {
             return Err(Error::FrameIndexOutOfRange);
@@ -616,6 +632,8 @@ impl<'a> Frames<'a> {
 
     /// Return the offset (position in the DSF file in bytes) of the
     /// specified frame.
+    ///
+    /// # Panic
     ///
     /// This method will panic if `frame_index` is out of range. Use
     /// the checked version of this method if you can not be sure of
@@ -629,6 +647,10 @@ impl<'a> Frames<'a> {
     /// Return the frame and block index as a tuple `(frame_index,
     /// block_index)` for the given `sample_index` if they exist or a
     /// out of range error if `sample_index >= sample_count`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `sample_index >= sample_count`.
     pub fn frame_and_block_index(&self, sample_index: u64) -> Result<(u64, usize), Error> {
         if sample_index >= self.dsf_file.fmt_chunk.sample_count {
             return Err(Error::SampleIndexOutOfRange);
@@ -656,8 +678,13 @@ impl<'a> Frames<'a> {
     /// Load the frame specified by `frame_index` into memory.
     ///
     /// The `Frames` struct keeps only one frame in memory at a
-    /// time. This method returns an error if `frames_index` is out of
+    /// time.
+    ///
+    /// # Errors
+    ///
+    ///  This method returns an error if `frames_index` is out of
     /// range or there is an `io::Error`.
+    ///
     pub fn load_frame(&mut self, frame_index: u64) -> Result<(), Error> {
         if frame_index >= self.frame_count {
             return Err(Error::FrameIndexOutOfRange);
@@ -701,6 +728,10 @@ impl<'a> Frames<'a> {
     }
 
     /// Return a `u32` containing the specified sample and channel.
+    ///
+    /// # Errors
+    ///
+    /// This method returns an error if `sample_index` is out of range or if unable to read the frame.
     pub fn samples_as_u32(
         &mut self,
         channel_index: usize,
@@ -716,23 +747,21 @@ impl<'a> Frames<'a> {
             self.load_frame(frame_index)?;
         }
 
-        let samples_as_u8_array: [u8; 4];
-
-        if self.reverse_bits {
-            samples_as_u8_array = [
+        let samples_as_u8_array: [u8; 4] = if self.reverse_bits {
+            [
                 self.frame[channel_index][block_index].reverse_bits(),
                 self.frame[channel_index][block_index + 1].reverse_bits(),
                 self.frame[channel_index][block_index + 2].reverse_bits(),
                 self.frame[channel_index][block_index + 3].reverse_bits(),
-            ];
+            ]
         } else {
-            samples_as_u8_array = [
+            [
                 self.frame[channel_index][block_index],
                 self.frame[channel_index][block_index + 1],
                 self.frame[channel_index][block_index + 2],
                 self.frame[channel_index][block_index + 3],
-            ];
-        }
+            ]
+        };
 
         Ok(u32::from_le_bytes(samples_as_u8_array))
     }
@@ -750,23 +779,21 @@ impl<'a> Frames<'a> {
             self.load_frame_unchecked(frame_index)?;
         }
 
-        let samples_as_u8_array: [u8; 4];
-
-        if self.reverse_bits {
-            samples_as_u8_array = [
+        let samples_as_u8_array: [u8; 4] = if self.reverse_bits {
+            [
                 self.frame[channel_index][block_index].reverse_bits(),
                 self.frame[channel_index][block_index + 1].reverse_bits(),
                 self.frame[channel_index][block_index + 2].reverse_bits(),
                 self.frame[channel_index][block_index + 3].reverse_bits(),
-            ];
+            ]
         } else {
-            samples_as_u8_array = [
+            [
                 self.frame[channel_index][block_index],
                 self.frame[channel_index][block_index + 1],
                 self.frame[channel_index][block_index + 2],
                 self.frame[channel_index][block_index + 3],
-            ];
-        }
+            ]
+        };
 
         Ok(u32::from_le_bytes(samples_as_u8_array))
     }
@@ -804,11 +831,13 @@ impl<'a> InterleavedU32SamplesIter<'a> {
 
     /// Return the current `sample_index`, which starts from 0 and
     /// goes up to `sample_count - 1`.
+    #[must_use]
     pub fn sample_index(&self) -> u64 {
         self.sample_index
     }
 
     /// Return the sample count for the associated DSF file.
+    #[must_use]
     pub fn sample_count(&self) -> u64 {
         self.sample_count
     }
@@ -818,6 +847,14 @@ impl<'a> InterleavedU32SamplesIter<'a> {
     /// normalised so that it corresponds to the first 1-bit sample in
     /// the next returned `u32`. An error is returned if the requested
     /// `sample_index` is out of range.
+    ///
+    /// This method is useful for seeking to a specific sample.
+    /// `sample_index` is normalised so that it corresponds to the
+    /// first 1-bit sample in the next returned `u32`.
+    /// `sample_index` is also checked to be in range.
+    ///
+    /// # Errors
+    /// If `sample_index` is out of range, an error is returned.
     pub fn set_sample_index(&mut self, sample_index: u64) -> Result<u64, Error> {
         if sample_index >= self.sample_count {
             return Err(Error::SampleIndexOutOfRange);

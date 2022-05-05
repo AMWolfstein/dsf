@@ -1,8 +1,8 @@
 [package]
 name = "dsf"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Daniel J. R. May <daniel.may@danieljrmay.com>"]
-edition = "2018"
+edition = "2021"
 description = "DSF (DSD Stream File) support for Rust"
 homepage = "https://gitlab.com/danieljrmay/dsf"
 documentation = "https://docs.rs/dsf/"
@@ -18,5 +18,5 @@ exclude = [
 ]
 
 [dependencies]
-sampled_data_duration = "0.1.0"
-id3 = "0.5.1"
+sampled_data_duration = "0.2.0"
+id3 = "1.0.2"
