@@ -559,12 +559,14 @@ impl TryFrom<[u8; 12]> for DataChunk {
 const BLOCK_SIZE: usize = 4096;
 /// We define another version of the block size as a `u32` because
 /// when we try to simply cast a `usize` to a `u32` we get the
-/// following pedantic clippy warning: "casting `usize` to `u32` may
+/// following pedantic clippy warning: *casting `usize` to `u32` may
 /// truncate the value on targets with 64-bit wide
-/// pointers". Obviously, this is a false-positive because we are
-/// dealing with a constant which is well within the range of a
-/// `u32`. However, in the interests of getting a perfect report from
-/// clippy we add the following constant:
+/// pointers*. Obviously, this is a false-positive because we are
+/// dealing with a constant which is well within the range of a `u32`,
+/// see clippy [issue
+/// 7486](https://github.com/rust-lang/rust-clippy/issues/8316#issue-1109140641). However,
+/// in the interests of getting a perfect report from clippy we add
+/// the following constant:
 const BLOCK_SIZE_AS_U32: u32 = 4096;
 
 /// There are 8 1-bit DSD samples per byte.
