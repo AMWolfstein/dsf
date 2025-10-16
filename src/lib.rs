@@ -110,8 +110,19 @@ impl DsfFile {
         let id3_tag: Option<Tag> = if dsd_chunk.metadata_offset == 0 {
             None
         } else {
-            file.seek(SeekFrom::Start(dsd_chunk.metadata_offset))?;
-            Some(Tag::read_from(&file)?)
+            match file.seek(SeekFrom::Start(dsd_chunk.metadata_offset)) {
+                Ok(_n) => match Tag::read_from(&file) {
+                    Ok(tag) => Some(tag),
+                    Err(e) => {
+                        eprintln!("Warning: Failed to read ID3 tag: {}", e);
+                        None
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Warning: Failed to seek to ID3 tag: {}", e);
+                    None
+                }
+            }
         };
 
         Ok(DsfFile {
