@@ -1,3 +1,8 @@
+/*
+ 20251014: Changed by clone206 to prevent id3 errors from stopping processing of audio.
+
+*/
+
 //! DSF file utilities.
 //!
 //! A DSF (DSD Stream File) is a high-resolution audio file which
