@@ -55,7 +55,7 @@ use std::u64;
 /// - [Fmt chunk](struct.FmtChunk.html): information about the audio format e.g. sampling rate, etc.
 /// - [Data chunk](struct.DataChunk.html): the audio samples.
 /// - [Metadata chunk](id3::Tag): an optional `ID3v2` metadata tag.
-/// - [Tag read fail](bool): a boolean indicating if the attempted `ID3` tag read failed.
+/// - [Tag read error](Option<Error>): an error if the attempted `ID3` tag read failed.
 ///
 /// The fields of the `DsfFile` struct reflect this specification,
 /// with an additional [File](std::fs::File) field for the underlying file.
@@ -65,7 +65,7 @@ pub struct DsfFile {
     fmt_chunk: FmtChunk,
     data_chunk: DataChunk,
     id3_tag: Option<Tag>,
-    tag_read_fail: bool,
+    tag_read_err: Option<Error>,
 }
 impl DsfFile {
     /// Attempt to open and parse the metadata of DSF file in
@@ -115,7 +115,7 @@ impl DsfFile {
             fmt_chunk: fmt_chunk,
             data_chunk: data_chunk,
             id3_tag: None,
-            tag_read_fail: false
+            tag_read_err: None
         };
 
         dsf_file.id3_tag = if dsf_file.dsd_chunk.metadata_offset == 0 {
@@ -124,13 +124,13 @@ impl DsfFile {
             match dsf_file.file.seek(SeekFrom::Start(dsf_file.dsd_chunk.metadata_offset)) {
                 Ok(_n) => match Tag::read_from(&dsf_file.file) {
                     Ok(tag) => Some(tag),
-                    Err(_e) => {
-                        dsf_file.tag_read_fail = true;
+                    Err(e) => {
+                        dsf_file.tag_read_err = Some(Error::from(e));
                         None
                     }
                 },
-                Err(_e) => {
-                    dsf_file.tag_read_fail = true;
+                Err(e) => {
+                    dsf_file.tag_read_err = Some(Error::from(e));
                     None
                 }
             }
@@ -189,9 +189,9 @@ impl DsfFile {
         InterleavedU32SamplesIter::new(self)
     }
 
-    /// Return whether the attempt to read the ID3 tag failed.
-    pub fn tag_read_fail(&self) -> bool {
-        self.tag_read_fail
+    /// Return the error if attempt to read the ID3 tag failed.
+    pub fn tag_read_err(&self) -> Option<&Error> {
+        self.tag_read_err.as_ref() 
     }
 
     // TODO: fn channel_samples_iter(channel_index: u32) -> ChannelSamplesIter
