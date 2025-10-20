@@ -60,10 +60,10 @@ use std::u64;
 /// - [Fmt chunk](struct.FmtChunk.html): information about the audio format e.g. sampling rate, etc.
 /// - [Data chunk](struct.DataChunk.html): the audio samples.
 /// - [Metadata chunk](id3::Tag): an optional `ID3v2` metadata tag.
-/// - [Tag read error](Option<Error>): an error if the attempted `ID3` tag read failed.
 ///
 /// The fields of the `DsfFile` struct reflect this specification,
-/// with an additional [File](std::fs::File) field for the underlying file.
+/// with an additional [File](std::fs::File) field for the underlying file,
+/// and a [Tag read error](Option<Error>) field to store any error that occurred while reading the ID3 tag.
 pub struct DsfFile {
     file: File,
     dsd_chunk: DsdChunk,
