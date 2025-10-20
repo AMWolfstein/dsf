@@ -55,6 +55,7 @@ use std::u64;
 /// - [Fmt chunk](struct.FmtChunk.html): information about the audio format e.g. sampling rate, etc.
 /// - [Data chunk](struct.DataChunk.html): the audio samples.
 /// - [Metadata chunk](id3::Tag): an optional `ID3v2` metadata tag.
+/// - [Tag read fail](bool): a boolean indicating if the attempted `ID3` tag read failed.
 ///
 /// The fields of the `DsfFile` struct reflect this specification,
 /// with an additional [File](std::fs::File) field for the underlying file.
@@ -64,6 +65,7 @@ pub struct DsfFile {
     fmt_chunk: FmtChunk,
     data_chunk: DataChunk,
     id3_tag: Option<Tag>,
+    tag_read_fail: bool,
 }
 impl DsfFile {
     /// Attempt to open and parse the metadata of DSF file in
@@ -107,31 +109,34 @@ impl DsfFile {
         file.read_exact(&mut data_chunk_buffer)?;
         let data_chunk = DataChunk::try_from(data_chunk_buffer)?;
 
-        let id3_tag: Option<Tag> = if dsd_chunk.metadata_offset == 0 {
+        let mut dsf_file = DsfFile {
+            file: file,
+            dsd_chunk: dsd_chunk,
+            fmt_chunk: fmt_chunk,
+            data_chunk: data_chunk,
+            id3_tag: None,
+            tag_read_fail: false
+        };
+
+        dsf_file.id3_tag = if dsf_file.dsd_chunk.metadata_offset == 0 {
             None
         } else {
-            match file.seek(SeekFrom::Start(dsd_chunk.metadata_offset)) {
-                Ok(_n) => match Tag::read_from(&file) {
+            match dsf_file.file.seek(SeekFrom::Start(dsf_file.dsd_chunk.metadata_offset)) {
+                Ok(_n) => match Tag::read_from(&dsf_file.file) {
                     Ok(tag) => Some(tag),
-                    Err(e) => {
-                        eprintln!("Warning: Failed to read ID3 tag: {}", e);
+                    Err(_e) => {
+                        dsf_file.tag_read_fail = true;
                         None
                     }
                 },
-                Err(e) => {
-                    eprintln!("Warning: Failed to seek to ID3 tag: {}", e);
+                Err(_e) => {
+                    dsf_file.tag_read_fail = true;
                     None
                 }
             }
         };
 
-        Ok(DsfFile {
-            file,
-            dsd_chunk,
-            fmt_chunk,
-            data_chunk,
-            id3_tag,
-        })
+        Ok(dsf_file)
     }
 
     /// Return a reference to the underlying [File](std::fs::File).
@@ -182,6 +187,11 @@ impl DsfFile {
     /// This function will return an error if the sample data is not readable.
     pub fn interleaved_u32_samples_iter(&mut self) -> Result<InterleavedU32SamplesIter, Error> {
         InterleavedU32SamplesIter::new(self)
+    }
+
+    /// Return whether the attempt to read the ID3 tag failed.
+    pub fn tag_read_fail(&self) -> bool {
+        self.tag_read_fail
     }
 
     // TODO: fn channel_samples_iter(channel_index: u32) -> ChannelSamplesIter
