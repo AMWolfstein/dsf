@@ -125,8 +125,9 @@ impl DsfFile {
                 Ok(_n) => match Tag::read_from(&dsf_file.file) {
                     Ok(tag) => Some(tag),
                     Err(e) => {
+                        let partial = e.partial_tag.clone();
                         dsf_file.tag_read_err = Some(Error::from(e));
-                        None
+                        partial
                     }
                 },
                 Err(e) => {
