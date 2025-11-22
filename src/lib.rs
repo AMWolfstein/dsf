@@ -85,7 +85,7 @@ impl DsfFile {
     /// # Examples
     ///
     ///```no_run
-    /// use dsf::DsfFile;
+    /// use dsf_meta::DsfFile;
     /// use std::path::Path;
     ///
     /// let path = Path::new("my/music.dsf");
