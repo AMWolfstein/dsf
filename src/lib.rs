@@ -24,11 +24,25 @@
 //!
 //! match DsfFile::open(path) {
 //!     Ok(dsf_file) => {
-//!         println!("DSF file metadata:\n\n{}", dsf_file);
+//!         eprintln!("DSF file metadata:\n\n{}", dsf_file);
 //!     }
 //!     Err(error) => {
-//!         println!("Error: {}", error);
+//!         eprintln!("Error: {}", error);
 //!     }
+//! }
+//! ```
+//! 
+//! Recovering from ID3 errors example:
+//!```no_run
+//! use dsf_meta::DsfFile;
+//! use std::path::Path;
+//! 
+//! let path = Path::new("my/music.dsf");
+//! 
+//! let mut dsf_file = DsfFile::open(path).unwrap();
+//! 
+//! if let Some(e) = dsf_file.tag_read_err() {
+//!     eprintln!("[Warning] Full read of ID3 tag failed. Partial read attempted: {}", e);
 //! }
 //! ```
 
