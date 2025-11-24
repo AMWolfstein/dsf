@@ -1,6 +1,6 @@
 [package]
 name = "dsf-meta"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Daniel J. R. May <daniel.may@danieljrmay.com>", "clone206 clone206@hotmail.com"]
 edition = "2024"
 description = "DSF (DSD Stream File) support for Rust"
