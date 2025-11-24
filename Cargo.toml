@@ -1,12 +1,12 @@
 [package]
 name = "dsf-meta"
-version = "0.2.2"
-authors = ["Daniel J. R. May <daniel.may@danieljrmay.com>"]
-edition = "2021"
+version = "0.2.3"
+authors = ["Daniel J. R. May <daniel.may@danieljrmay.com>", "clone206 clone206@hotmail.com"]
+edition = "2024"
 description = "DSF (DSD Stream File) support for Rust"
-homepage = "https://gitlab.com/danieljrmay/dsf"
+homepage = "https://gitlab.com/clone206/dsf"
 documentation = "https://docs.rs/dsf/"
-repository = "https://gitlab.com/danieljrmay/dsf"
+repository = "https://gitlab.com/clone206/dsf"
 keywords = ["audio", "dsd", "dsf"]
 categories = ["multimedia::audio"]
 readme = "README.md"

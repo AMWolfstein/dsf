@@ -50,6 +50,9 @@ use std::io::SeekFrom;
 use std::path::Path;
 use std::u64;
 
+/// The offset in bytes of the sample data within a DSF file.
+pub const DSF_SAMPLE_DATA_OFFSET: u64 = 92;
+
 /// In memory representation of a DSF file.
 ///
 /// The [DSF File Format
