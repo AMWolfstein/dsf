@@ -8,6 +8,24 @@ modulation aka Direct Stream Digital (DSD). The format is intended for
 
 This package is a mostly compatible fork of the dsf crate by Daniel J. R. May, but it focuses on reading metadata and leaves it up to the implementor to iterate over the dsd samples using the info from that metadata, such as the audio offset and number of samples. It also allows for incomplete ID3 tag reads without causing a failure to instantiate the DsfFile object:
 
+## Examples
+
+```rust
+ use dsf_meta::DsfFile;
+ use std::path::Path;
+
+ let path = Path::new("my/music.dsf");
+
+ match DsfFile::open(path) {
+     Ok(dsf_file) => {
+         eprintln!("DSF file metadata:\n\n{}", dsf_file);
+     }
+     Err(error) => {
+         eprintln!("Error: {}", error);
+     }
+ }
+ ```
+
 ```rust
 let mut dsf_file = DsfFile::open(path).unwrap();
 if let Some(e) = dsf_file.tag_read_err() {
