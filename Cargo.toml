@@ -5,7 +5,6 @@ authors = ["Daniel J. R. May <daniel.may@danieljrmay.com>", "clone206 clone206@h
 edition = "2024"
 description = "DSF (DSD Stream File) support for Rust"
 homepage = "https://gitlab.com/clone206/dsf"
-documentation = "https://docs.rs/dsf/"
 repository = "https://gitlab.com/clone206/dsf"
 keywords = ["audio", "dsd", "dsf"]
 categories = ["multimedia::audio"]
