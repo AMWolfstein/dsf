@@ -62,7 +62,7 @@ use std::u64;
 /// - [Metadata chunk](id3::Tag): an optional `ID3v2` metadata tag.
 ///
 /// The fields of the `DsfFile` struct reflect this specification,
-/// with an additional [File](std::fs::File) field for the underlying file,
+/// with an additional [File] field for the underlying file,
 /// and a [Tag read error](Option<Error>) field to store any error that occurred while reading the ID3 tag.
 pub struct DsfFile {
     file: File,
@@ -145,7 +145,7 @@ impl DsfFile {
         Ok(dsf_file)
     }
 
-    /// Return a reference to the underlying [File](std::fs::File).
+    /// Return a reference to the underlying [File]
     #[must_use]
     pub fn file(&self) -> &File {
         &self.file
@@ -169,7 +169,7 @@ impl DsfFile {
         &self.data_chunk
     }
 
-    /// Return a reference to the optional `ID3v2` [Tag](id3::Tag).
+    /// Return a reference to the optional `ID3v2` [Tag]
     #[must_use]
     pub fn id3_tag(&self) -> &Option<Tag> {
         &self.id3_tag
