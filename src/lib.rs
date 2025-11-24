@@ -127,7 +127,7 @@ impl DsfFile {
             None
         } else {
             match dsf_file.file.seek(SeekFrom::Start(dsf_file.dsd_chunk.metadata_offset)) {
-                Ok(_n) => match Tag::read_from(&dsf_file.file) {
+                Ok(_n) => match Tag::read_from2(&dsf_file.file) {
                     Ok(tag) => Some(tag),
                     Err(e) => {
                         let partial = e.partial_tag.clone();
