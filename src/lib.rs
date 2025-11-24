@@ -39,7 +39,7 @@
 //! 
 //! let path = Path::new("my/music.dsf");
 //! 
-//! let mut dsf_file = DsfFile::open(path).unwrap();
+//! let dsf_file = DsfFile::open(path).unwrap();
 //! 
 //! if let Some(e) = dsf_file.tag_read_err() {
 //!     eprintln!("[Warning] Full read of ID3 tag failed. Partial read attempted: {}", e);

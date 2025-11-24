@@ -11,23 +11,28 @@ This package is a mostly compatible fork of the dsf crate by Daniel J. R. May, b
 ## Examples
 
 ```rust
- use dsf_meta::DsfFile;
- use std::path::Path;
+use dsf_meta::DsfFile;
+use std::path::Path;
 
- let path = Path::new("my/music.dsf");
+let path = Path::new("my/music.dsf");
 
- match DsfFile::open(path) {
-     Ok(dsf_file) => {
-         eprintln!("DSF file metadata:\n\n{}", dsf_file);
-     }
-     Err(error) => {
-         eprintln!("Error: {}", error);
-     }
- }
- ```
+match DsfFile::open(path) {
+    Ok(dsf_file) => {
+        eprintln!("DSF file metadata:\n\n{}", dsf_file);
+    }
+    Err(error) => {
+        eprintln!("Error: {}", error);
+    }
+}
+```
 
 ```rust
-let mut dsf_file = DsfFile::open(path).unwrap();
+use dsf_meta::DsfFile;
+use std::path::Path;
+
+let path = Path::new("my/music.dsf");
+
+let dsf_file = DsfFile::open(path).unwrap();
 if let Some(e) = dsf_file.tag_read_err() {
     eprintln!("[Warning] Full read of ID3 tag failed. Partial read attempted: {}", e);
 }
