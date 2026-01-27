@@ -11,7 +11,7 @@ This package is a mostly compatible fork of the dsf crate by Daniel J. R. May, b
 For a crate that makes use of this library and does provide access to the audio data, see [`dsd-reader`](https://crates.io/crates/dsd-reader).
 
 ## Examples
-### Reading file and catching any fatal errors
+### Read file, print metadata, or catch any fatal errors
 ```rust
 use dsf_meta::DsfFile;
 use std::path::Path;
