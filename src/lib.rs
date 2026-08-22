@@ -222,15 +222,15 @@ impl DsdSourceExtensions for DsfFile {
 impl DsdSource for DsfFile {
     fn info(&self) -> Result<DsdSourceInfo, DsdSourceError> {
         Ok(DsdSourceInfo {
-            channels: self.fmt_chunk.channel_num() as usize,
-            endianness: if self.fmt_chunk.bits_per_sample() == 1 {
+            channels: Some(self.fmt_chunk.channel_num() as usize),
+            endianness: Some(if self.fmt_chunk.bits_per_sample() == 1 {
                 Endianness::LsbFirst
             } else {
                 Endianness::MsbFirst
-            },
-            layout: FmtType::Planar,
-            block_size: DSF_BLOCK_SIZE,
-            sample_rate: self.fmt_chunk.sampling_frequency(),
+            }),
+            layout: Some(FmtType::Planar),
+            block_size: Some(DSF_BLOCK_SIZE),
+            sample_rate: Some(self.fmt_chunk.sampling_frequency()),
             audio_length: self.fmt_chunk.sample_count() / 8
                 * self.fmt_chunk.channel_num() as u64,
             data_offset: DSF_SAMPLE_DATA_OFFSET,
@@ -242,6 +242,10 @@ impl DsdSource for DsfFile {
         let mut file = self.file.try_clone()?;
         file.seek(SeekFrom::Start(DSF_SAMPLE_DATA_OFFSET))?;
         Ok(Box::new(file))
+    }
+
+    fn file_len(&self) -> Result<u64, DsdSourceError> {
+        Ok(self.file.metadata()?.len())
     }
 }
 
