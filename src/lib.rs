@@ -243,6 +243,10 @@ impl DsdSource for DsfFile {
         file.seek(SeekFrom::Start(DSF_SAMPLE_DATA_OFFSET))?;
         Ok(Box::new(file))
     }
+
+    fn file_len(&self) -> Result<u64, DsdSourceError> {
+        Ok(self.file.metadata()?.len())
+    }
 }
 
 /// Return a `u64` which starts from `index` in the specified byte
