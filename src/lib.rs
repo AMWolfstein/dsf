@@ -52,7 +52,7 @@
 mod id3_display;
 
 use crate::id3_display::id3_tag_to_string;
-use dsd_source::{DsdSource, DsdSourceError, DsdSourceInfo, Endianness, FmtType};
+use dsd_source::{DsdSource, DsdSourceError, DsdSourceExtensions, DsdSourceInfo, Endianness, FmtType};
 use id3::Tag;
 use sampled_data_duration::ConstantRateDuration;
 use std::convert::TryFrom;
@@ -213,6 +213,10 @@ impl fmt::Display for DsfFile {
             self.dsd_chunk, self.fmt_chunk, self.data_chunk, &id3_tag_as_string,
         )
     }
+}
+
+impl DsdSourceExtensions for DsfFile {
+    const EXTENSIONS: &'static [&'static str] = &["dsf"];
 }
 
 impl DsdSource for DsfFile {
