@@ -229,6 +229,7 @@ impl DsdSource for DsfFile {
             sample_rate: self.fmt_chunk.sampling_frequency(),
             audio_length: self.fmt_chunk.sample_count() / 8
                 * self.fmt_chunk.channel_num() as u64,
+            data_offset: DSF_SAMPLE_DATA_OFFSET,
             tag: self.id3_tag.clone(),
         })
     }
