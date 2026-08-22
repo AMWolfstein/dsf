@@ -52,6 +52,7 @@
 mod id3_display;
 
 use crate::id3_display::id3_tag_to_string;
+use dsd_source::{DsdSource, DsdSourceError, DsdSourceExtensions, DsdSourceInfo, Endianness, FmtType};
 use id3::Tag;
 use sampled_data_duration::ConstantRateDuration;
 use std::convert::TryFrom;
@@ -66,6 +67,9 @@ use std::u64;
 
 /// The offset in bytes of the sample data within a DSF file.
 pub const DSF_SAMPLE_DATA_OFFSET: u64 = 92;
+
+/// DSF audio is planar with a fixed block size per channel.
+pub const DSF_BLOCK_SIZE: u32 = 4096;
 
 /// In memory representation of a DSF file.
 ///
@@ -208,6 +212,36 @@ impl fmt::Display for DsfFile {
             "DSD chunk:\n{}\n\nFmt chunk:\n{}\n\nData chunk:\n{}\n\nID3Tag:\n{}",
             self.dsd_chunk, self.fmt_chunk, self.data_chunk, &id3_tag_as_string,
         )
+    }
+}
+
+impl DsdSourceExtensions for DsfFile {
+    const EXTENSIONS: &'static [&'static str] = &["dsf"];
+}
+
+impl DsdSource for DsfFile {
+    fn info(&self) -> Result<DsdSourceInfo, DsdSourceError> {
+        Ok(DsdSourceInfo {
+            channels: self.fmt_chunk.channel_num() as usize,
+            endianness: if self.fmt_chunk.bits_per_sample() == 1 {
+                Endianness::LsbFirst
+            } else {
+                Endianness::MsbFirst
+            },
+            layout: FmtType::Planar,
+            block_size: DSF_BLOCK_SIZE,
+            sample_rate: self.fmt_chunk.sampling_frequency(),
+            audio_length: self.fmt_chunk.sample_count() / 8
+                * self.fmt_chunk.channel_num() as u64,
+            data_offset: DSF_SAMPLE_DATA_OFFSET,
+            tag: self.id3_tag.clone(),
+        })
+    }
+
+    fn reader(&self) -> Result<Box<dyn Read + Send>, DsdSourceError> {
+        let mut file = self.file.try_clone()?;
+        file.seek(SeekFrom::Start(DSF_SAMPLE_DATA_OFFSET))?;
+        Ok(Box::new(file))
     }
 }
 
