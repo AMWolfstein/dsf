@@ -1,6 +1,6 @@
 [package]
 name = "dsf-meta"
-version = "0.2.8"
+version = "0.3.0"
 authors = ["Daniel J. R. May <daniel.may@danieljrmay.com>", "clone206 clone206@hotmail.com"]
 edition = "2024"
 description = "DSF (DSD Stream File) support for Rust"
@@ -19,5 +19,4 @@ exclude = [
 [dependencies]
 sampled_data_duration = "0.3.1"
 id3 = "1.0.2"
-# TEMP local-dev override, revert to a version pin before publishing
-dsd-source = { path = "../../github/dsd-source" }
+dsd-source = "0.2.0"
